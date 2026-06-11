@@ -17,6 +17,10 @@
   <img src="assets/demo.gif" width="850" alt="WhisperPress デモ — 中国語・英語・日本語をメモ帳に直接音声入力" />
 </p>
 
+<p align="center">🔊 <b>実際の音声付きフルデモ</b> — 中国語・英語・日本語をメモ帳に音声入力：</p>
+
+https://github.com/user-attachments/assets/8db4657f-edae-42f2-b6db-351bb214fe22
+
 ---
 
 ## WhisperPress とは？

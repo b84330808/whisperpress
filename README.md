@@ -17,6 +17,10 @@
   <img src="assets/demo.gif" width="850" alt="WhisperPress demo — dictating Chinese, English and Japanese into Notepad" />
 </p>
 
+<p align="center">🔊 <b>Full demo with real voice</b> — Chinese, English and Japanese dictated into Notepad:</p>
+
+https://github.com/user-attachments/assets/8db4657f-edae-42f2-b6db-351bb214fe22
+
 ---
 
 ## Why WhisperPress?

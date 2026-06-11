@@ -17,6 +17,10 @@
   <img src="assets/demo.gif" width="850" alt="WhisperPress 示範 — 中英日三語聽寫直接打進記事本" />
 </p>
 
+<p align="center">🔊 <b>含真人聲音的完整示範</b> — 中英日三語直接聽寫進記事本：</p>
+
+https://github.com/user-attachments/assets/8db4657f-edae-42f2-b6db-351bb214fe22
+
 ---
 
 ## 為什麼選 WhisperPress？
