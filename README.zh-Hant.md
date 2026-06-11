@@ -39,6 +39,15 @@
 | 🔒 **架構層級的隱私** | 模型透過 whisper.cpp 在你的 CPU/GPU 上執行；筆記是磁碟上的純 JSON。 |
 | 🪶 **自訂詞彙** | Initial prompt 提示人名、術語與輸出風格（例如繁體中文）。 |
 
+## 下載安裝
+
+到 **[Releases 頁面](https://github.com/b84330808/whisperpress/releases/latest)** 下載：
+
+- `WhisperPress-Setup-x.x.x.exe` — 安裝版（建議，會建桌面捷徑）
+- `WhisperPress-Portable-x.x.x.exe` — 免安裝版，下載即用
+
+> 第一次執行時 Windows SmartScreen 可能會跳出警告（因為安裝檔未購買程式碼簽章），點「**其他資訊**」→「**仍要執行**」即可。原始碼全部公開在這裡，可自行檢視或自行打包。
+
 ## 開始使用
 
 ### 從原始碼執行

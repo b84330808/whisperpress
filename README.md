@@ -39,6 +39,15 @@ Press and hold a hotkey (default **F9**), talk, release — your speech is trans
 | 🔒 **Private by architecture** | Models run on your CPU/GPU via whisper.cpp. Notes are plain JSON on your disk. |
 | 🪶 **Custom vocabulary** | Initial-prompt hints for names, jargon, and output style (e.g. Traditional Chinese). |
 
+## Download
+
+Grab the latest build from the **[Releases page](https://github.com/b84330808/whisperpress/releases/latest)**:
+
+- `WhisperPress-Setup-x.x.x.exe` — installer (recommended, creates a desktop shortcut)
+- `WhisperPress-Portable-x.x.x.exe` — portable, just download and run
+
+> Windows SmartScreen may warn on first run (the binaries are not code-signed). Click **More info → Run anyway**. All source code is public here — review it or build it yourself.
+
 ## Getting started
 
 ### Run from source

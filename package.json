@@ -60,7 +60,15 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "artifactName": "WhisperPress-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "WhisperPress-Portable-${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
     }
   }
 }
