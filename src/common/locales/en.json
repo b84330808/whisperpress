@@ -106,7 +106,7 @@
   "settings.translate": "Translate to English",
   "settings.prompt": "Initial prompt",
   "settings.promptTip": "Fake context fed to Whisper before decoding — output tends to continue its wording and style:\n• Proper nouns — list names, companies and jargon you say often; similar-sounding speech resolves to them\n• Style — include a sample sentence in your preferred style\n• A punctuated prompt also encourages punctuated output\nNote: this is a probabilistic bias, not a guarantee.",
-  "settings.promptPh": "e.g. Names: WhisperPress, Kubernetes, PostgreSQL, commit",
+  "settings.promptPh": "e.g. Okay, let's begin. Names: WhisperPress, Kubernetes, commit. (a punctuated prompt yields punctuated output)",
 
   "settings.models": "Models & engine",
   "settings.engineStatus": "Engine status",

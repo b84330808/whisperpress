@@ -53,15 +53,22 @@ function bootstrap() {
     if (config.get().onboarded && config.get().model) engine.start();
 
     // default initial prompt follows the UI language — but never overwrite a
-    // prompt the user customized (only empty or one of our known defaults)
+    // prompt the user customized (only empty or one of our known defaults).
+    // The prompt itself contains punctuation: whisper mirrors the prompt style,
+    // and an unpunctuated Chinese prompt yields unpunctuated output.
     const DEFAULT_PROMPTS = {
-      'zh-Hant': '以下是繁體中文的逐字稿：',
-      ja: '以下は日本語の文字起こしです。',
+      'zh-Hant': '你好，準備好了嗎？嗯，我們開始吧。',
+      ja: 'はい、わかりました。それでは、始めましょう。',
       en: '',
     };
+    const LEGACY_PROMPTS = [
+      '以下是繁體中文的逐字稿：',
+      '以下是繁體中文的句子，內容會加上標點符號。',
+      '以下は日本語の文字起こしです。',
+    ];
     function syncLocaleDefaults(data) {
       const def = DEFAULT_PROMPTS[i18n.resolveLocale()] ?? '';
-      const known = Object.values(DEFAULT_PROMPTS).filter(Boolean);
+      const known = [...Object.values(DEFAULT_PROMPTS), ...LEGACY_PROMPTS].filter(Boolean);
       const cur = data.initialPrompt || '';
       const patch = {};
       if ((!cur || known.includes(cur)) && cur !== def) patch.initialPrompt = def;
@@ -81,6 +88,8 @@ function bootstrap() {
       if (engineKeys.some((k) => k in patch) && data.model) engine.start();
       windows.broadcast('settings:changed', data);
     });
+    // migrate prompts from older defaults once per launch
+    syncLocaleDefaults(config.get());
   });
 
   app.on('window-all-closed', () => { /* stay in tray */ });

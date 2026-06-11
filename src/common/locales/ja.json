@@ -106,7 +106,7 @@
   "settings.translate": "英語に翻訳",
   "settings.prompt": "初期プロンプト",
   "settings.promptTip": "Whisper に与える「擬似的な文脈」で、出力はその語彙やスタイルに寄ります：\n• 固有名詞 — よく話す人名・社名・専門用語を並べると、似た発音がそれらに解決されます\n• スタイル誘導 — 好みの文体の例文を 1 つ入れる\n• 句読点付きのプロンプトは句読点付きの出力を促します\n注意：これは確率的な傾向であり保証ではありません。",
-  "settings.promptPh": "例：人名：田中太郎。用語：WhisperPress、Kubernetes、commit",
+  "settings.promptPh": "例：はい、始めましょう。用語：WhisperPress、commit。（句読点付きのプロンプトは句読点付きの出力を促します）",
 
   "settings.models": "モデルとエンジン",
   "settings.engineStatus": "エンジンの状態",

@@ -106,7 +106,7 @@
   "settings.translate": "翻譯成英文",
   "settings.prompt": "初始提示詞",
   "settings.promptTip": "餵給 Whisper 的「假上下文」，模型會傾向延續它的用詞與風格：\n• 專有名詞 — 放常說的人名、公司、術語，發音相近時會優先拼出這些字\n• 風格引導 — 放一句你偏好風格的範例句\n• 提示句帶標點，輸出也更會加標點\n注意：這是機率上的偏好、不是保證。",
-  "settings.promptPh": "例：人名：王小明。術語：WhisperPress、Kubernetes、commit",
+  "settings.promptPh": "例：你好，我們開始吧。人名：王小明。術語：WhisperPress、commit。（帶標點的提示能讓輸出也有標點）",
 
   "settings.models": "模型與引擎",
   "settings.engineStatus": "引擎狀態",

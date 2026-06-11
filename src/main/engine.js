@@ -50,6 +50,20 @@ function isChineseLang(lang) { return /^(zh|chinese)/i.test(lang || ''); }
 // for streamed segments before the detected language is known: hanzi but no kana
 function looksChinese(text) { return /[一-鿿]/.test(text) && !/[぀-ヿ]/.test(text); }
 
+// whisper emits ASCII punctuation in Chinese text; switch to full-width, but only
+// after a CJK character so Latin fragments (names, code) keep theirs
+function normalizeChinesePunct(text) {
+  return text
+    .replace(/([一-鿿])\s*,\s*/g, '$1，')
+    .replace(/([一-鿿])\s*\?/g, '$1？')
+    .replace(/([一-鿿])\s*!/g, '$1！')
+    .replace(/([一-鿿])\s*;/g, '$1；')
+    .replace(/([一-鿿])\s*\.(?=$|\s|[一-鿿])/g, '$1。');
+}
+function postprocessChinese(text, variant) {
+  return normalizeChinesePunct(convertChinese(text, variant));
+}
+
 class Engine extends EventEmitter {
   constructor() {
     super();
@@ -296,6 +310,9 @@ class Engine extends EventEmitter {
       '--port', String(this.port),
       '-t', String(this._threads()),
       '-l', cfg.language || 'auto',
+      // the server defaults to greedy decoding (bs -1, bo 2) unlike whisper-cli;
+      // greedy notoriously drops Chinese punctuation — match the CLI's beam search
+      '-bs', '5', '-bo', '5',
     ];
     if (cfg.translate) args.push('-tr');
     if (cfg.initialPrompt) args.push('--prompt', cfg.initialPrompt);
@@ -358,11 +375,13 @@ class Engine extends EventEmitter {
     const j = await res.json();
     if (j.error) throw new Error(`inference failed: ${j.error}`);
     const language = j.language || lang;
-    const variant = isChineseLang(language) ? config.get().chineseVariant : 'auto';
+    const isZh = isChineseLang(language);
+    const variant = isZh ? config.get().chineseVariant : 'auto';
+    const post = (s) => (isZh ? postprocessChinese(s, variant) : s);
     const segments = Array.isArray(j.segments)
-      ? j.segments.map((s) => ({ t0: Math.round((s.start || 0) * 1000), t1: Math.round((s.end || 0) * 1000), text: convertChinese((s.text || '').trim(), variant) }))
+      ? j.segments.map((s) => ({ t0: Math.round((s.start || 0) * 1000), t1: Math.round((s.end || 0) * 1000), text: post((s.text || '').trim()) }))
       : null;
-    return { text: convertChinese((j.text || '').trim(), variant), segments, language };
+    return { text: post((j.text || '').trim()), segments, language };
   }
 
   // ---------- transcription (long files, streaming CLI) ----------
@@ -410,7 +429,7 @@ class Engine extends EventEmitter {
             let text = m[9].trim();
             // detected language is only known at the end; use a heuristic for live output
             if (lang === 'zh' || (lang === 'auto' && looksChinese(text))) {
-              text = convertChinese(text, config.get().chineseVariant);
+              text = postprocessChinese(text, config.get().chineseVariant);
             }
             onSegment({ t0, t1, text });
           } else {
@@ -432,11 +451,12 @@ class Engine extends EventEmitter {
           const j = JSON.parse(fs.readFileSync(`${outBase}.json`, 'utf8'));
           try { fs.unlinkSync(`${outBase}.json`); } catch { /* ignore */ }
           const language = (j.result && j.result.language) || lang;
-          const variant = isChineseLang(language) ? config.get().chineseVariant : 'auto';
+          const isZh = isChineseLang(language);
+          const variant = isZh ? config.get().chineseVariant : 'auto';
           const segments = (j.transcription || []).map((s) => ({
             t0: s.offsets ? s.offsets.from : 0,
             t1: s.offsets ? s.offsets.to : 0,
-            text: convertChinese((s.text || '').trim(), variant),
+            text: isZh ? postprocessChinese((s.text || '').trim(), variant) : (s.text || '').trim(),
           }));
           resolve({
             text: segments.map((s) => s.text).join('\n').trim(),
