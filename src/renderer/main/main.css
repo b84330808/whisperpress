@@ -91,7 +91,7 @@ input.switch:checked { background: var(--accent); }
 input.switch:checked::after { left: 19px; background: #fff; }
 
 /* ---------- notes ---------- */
-.list-pane { width: 320px; flex: none; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg2); }
+.list-pane { width: clamp(300px, 28%, 440px); flex: none; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg2); }
 .list-head { padding: 14px 12px 10px; }
 #search { width: 100%; }
 .note-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
@@ -105,7 +105,7 @@ input.switch:checked::after { left: 19px; background: #fff; }
 .placeholder { margin: auto; text-align: center; color: var(--muted); }
 .ph-icon { font-size: 42px; margin-bottom: 12px; }
 .placeholder kbd { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; font-family: Consolas, monospace; }
-#note-detail { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+#note-detail { display: flex; flex-direction: column; gap: 12px; height: 100%; width: 100%; max-width: 1100px; margin: 0 auto; }
 .note-title { font-size: 17px; font-weight: 600; color: var(--text); background: transparent; border: 1px solid transparent; outline: none; }
 .note-title:hover { background: var(--bg3); border-color: var(--border); }
 .note-title:focus { background: var(--bg3); border-color: var(--accent); }
@@ -155,8 +155,10 @@ input.switch:checked::after { left: 19px; background: #fff; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 #meet-timer { font-size: 22px; font-variant-numeric: tabular-nums; }
 
+/* ---------- responsive content width ---------- */
+.view-body { max-width: 940px; margin: 0 auto; }
+
 /* ---------- settings ---------- */
-#view-settings { max-width: 760px; }
 .group { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin: 16px 0; }
 .row { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
 .row > label:first-child { width: 190px; flex: none; color: var(--text); font-size: 13.5px; }
