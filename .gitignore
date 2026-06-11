@@ -4,3 +4,5 @@ release/
 .DS_Store
 Thumbs.db
 .test/
+
+.claude/
