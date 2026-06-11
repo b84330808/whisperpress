@@ -22,6 +22,7 @@ const DEFAULTS = {
   closeToTray: true,
   threads: 0, // 0 = auto
   engineFlavor: 'cpu', // 'cpu' | 'cuda'
+  storageDir: '', // where engine+models live; '' = userData
   initialPrompt: '', // custom vocabulary / spelling hints passed to whisper
   ai: { enabled: false, baseUrl: 'http://localhost:11434/v1', apiKey: '', model: '' },
   onboarded: false,

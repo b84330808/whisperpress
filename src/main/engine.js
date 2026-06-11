@@ -31,10 +31,6 @@ const MODELS = [
 class Engine extends EventEmitter {
   constructor() {
     super();
-    this.root = path.join(app.getPath('userData'), 'engine');
-    this.modelDir = path.join(app.getPath('userData'), 'models');
-    fs.mkdirSync(this.root, { recursive: true });
-    fs.mkdirSync(this.modelDir, { recursive: true });
     this.proc = null;
     this.port = 0;
     this.state = 'stopped'; // stopped | starting | ready | error
@@ -45,6 +41,9 @@ class Engine extends EventEmitter {
   }
 
   // ---------- paths / discovery ----------
+  get dataRoot() { return config.get().storageDir || app.getPath('userData'); }
+  get root() { return path.join(this.dataRoot, 'engine'); }
+  get modelDir() { return path.join(this.dataRoot, 'models'); }
   flavorDir(flavor) { return path.join(this.root, flavor); }
   findExe(name, flavor) {
     const dir = this.flavorDir(flavor || config.get().engineFlavor);
@@ -75,6 +74,8 @@ class Engine extends EventEmitter {
       server: this.state,
       serverDetail: this.stateDetail,
       busy: this.busy,
+      activeDownloads: [...this.downloads.keys()],
+      storageDir: this.dataRoot,
     };
   }
 
@@ -88,6 +89,7 @@ class Engine extends EventEmitter {
   async _download(key, url, dest, totalHint) {
     const ac = new AbortController();
     this.downloads.set(key, ac);
+    this.emit('status', this.getState()); // activeDownloads changed
     const tmp = `${dest}.part`;
     try {
       const res = await fetch(url, { signal: ac.signal, redirect: 'follow' });
@@ -123,6 +125,35 @@ class Engine extends EventEmitter {
     if (ac) ac.abort();
   }
 
+  // Move engine + models to a new folder and use it from now on.
+  async setStorageDir(newDir) {
+    const oldRoot = this.dataRoot;
+    if (!newDir || path.resolve(newDir).toLowerCase() === path.resolve(oldRoot).toLowerCase()) return this.getState();
+    if (this.downloads.size) throw new Error('downloads in progress');
+    this.busy = true;
+    this._setState(this.state, this.stateDetail); // broadcast busy
+    try {
+      this.stop();
+      this.cancelFileTranscription();
+      await new Promise((r) => setTimeout(r, 400));
+      fs.mkdirSync(newDir, { recursive: true });
+      for (const sub of ['engine', 'models']) {
+        const src = path.join(oldRoot, sub);
+        const dst = path.join(newDir, sub);
+        if (fs.existsSync(src)) {
+          await fs.promises.cp(src, dst, { recursive: true, force: true });
+          try { fs.rmSync(src, { recursive: true, force: true }); } catch { /* leftovers are harmless */ }
+        }
+      }
+      config.set({ storageDir: newDir });
+      if (config.get().model) this.start();
+    } finally {
+      this.busy = false;
+      this.emit('status', this.getState());
+    }
+    return this.getState();
+  }
+
   async installEngine(flavor) {
     flavor = flavor || config.get().engineFlavor;
     const zip = ENGINE_ZIPS[flavor];
@@ -130,9 +161,16 @@ class Engine extends EventEmitter {
     const url = `https://github.com/ggml-org/whisper.cpp/releases/download/${WHISPER_CPP_VERSION}/${zip.name}`;
     const zipPath = path.join(this.root, zip.name);
     await this._download(`engine:${flavor}`, url, zipPath, zip.sizeMB * 1024 * 1024);
-    // Expand-Archive is always available on Windows; avoids a JS unzip dependency.
+    // a running server/cli holds locks inside the target dir — stop before replacing
+    this.stop();
+    this.cancelFileTranscription();
+    await new Promise((r) => setTimeout(r, 400));
     const dir = this.flavorDir(flavor);
-    fs.rmSync(dir, { recursive: true, force: true });
+    for (let i = 0; i < 4; i++) {
+      try { fs.rmSync(dir, { recursive: true, force: true }); break; }
+      catch { await new Promise((r) => setTimeout(r, 600)); } // if it stays locked, overwrite in place
+    }
+    // Expand-Archive is always available on Windows; avoids a JS unzip dependency.
     await new Promise((resolve, reject) => {
       const p = spawn('powershell.exe', [
         '-NoProfile', '-NonInteractive', '-Command',
@@ -146,6 +184,7 @@ class Engine extends EventEmitter {
     try { fs.unlinkSync(zipPath); } catch { /* ignore */ }
     if (!this.findExe('whisper-server.exe', flavor)) throw new Error('whisper-server.exe not found in archive');
     this.emit('status', this.getState());
+    if (config.get().model && config.get().engineFlavor === flavor) this.start();
   }
 
   async downloadModel(id) {

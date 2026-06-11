@@ -102,6 +102,10 @@
   "settings.flavorCpu": "CPU (works everywhere)",
   "settings.flavorCuda": "NVIDIA GPU (CUDA, ~440 MB download)",
   "settings.installEngine": "Install / reinstall engine",
+  "settings.storage": "Engine & model location",
+  "settings.change": "Change…",
+  "settings.openFolder": "Open folder",
+  "settings.storageMoveError": "Could not move the storage folder",
 
   "settings.ai": "AI features (optional)",
   "settings.aiDesc": "Summaries, titles and Q&A use any OpenAI-compatible endpoint. Point it at Ollama or LM Studio on this PC to stay fully offline.",
@@ -130,6 +134,7 @@
   "models.use": "Use",
   "models.delete": "Delete",
   "models.download": "Download",
+  "models.downloading": "Downloading…",
   "models.downloadError": "Model download failed",
   "models.tier.fastest": "fastest, draft quality",
   "models.tier.fast": "fast, casual notes",

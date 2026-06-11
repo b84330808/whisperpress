@@ -58,7 +58,7 @@
           <p class="muted" data-i18n="notes.placeholder2"></p>
         </div>
         <div id="note-detail" hidden>
-          <input id="note-title" class="note-title" />
+          <input id="note-title" type="text" class="note-title" />
           <div id="note-meta" class="note-meta"></div>
           <div class="toolbar">
             <button id="btn-copy" class="btn" data-i18n="note.copy"></button>
@@ -209,6 +209,12 @@
           <button id="btn-install-engine" class="btn" data-i18n="settings.installEngine"></button>
         </div>
         <div id="engine-install-progress" class="progress" hidden><div class="bar"></div><span class="pct"></span></div>
+        <div class="row">
+          <label data-i18n="settings.storage"></label>
+          <span id="storage-path" class="mono small storage-path"></span>
+          <button id="btn-storage-change" class="btn" data-i18n="settings.change"></button>
+          <button id="btn-storage-open" class="btn" data-i18n="settings.openFolder"></button>
+        </div>
         <div id="model-cards" class="model-cards"></div>
       </div>
 

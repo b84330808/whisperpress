@@ -106,8 +106,9 @@ input.switch:checked::after { left: 19px; background: #fff; }
 .ph-icon { font-size: 42px; margin-bottom: 12px; }
 .placeholder kbd { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; font-family: Consolas, monospace; }
 #note-detail { display: flex; flex-direction: column; gap: 12px; height: 100%; }
-.note-title { font-size: 17px; font-weight: 600; background: transparent; border: 1px solid transparent; }
-.note-title:hover, .note-title:focus { background: var(--bg3); border-color: var(--border); }
+.note-title { font-size: 17px; font-weight: 600; color: var(--text); background: transparent; border: 1px solid transparent; outline: none; }
+.note-title:hover { background: var(--bg3); border-color: var(--border); }
+.note-title:focus { background: var(--bg3); border-color: var(--accent); }
 .note-meta { font-size: 12px; color: var(--muted); display: flex; gap: 12px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .toolbar .spacer { flex: 1; }
@@ -169,8 +170,9 @@ input.switch:checked::after { left: 19px; background: #fff; }
 .mc-name { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 7px; }
 .mc-badge { font-size: 10px; padding: 2px 7px; border-radius: 8px; background: rgba(139, 92, 246, .2); color: var(--accent2); }
 .mc-info { font-size: 11.5px; color: var(--muted); }
-.mc-actions { display: flex; gap: 6px; margin-top: 4px; }
+.mc-actions { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
 .mc-actions .btn { padding: 4px 10px; font-size: 12px; }
+.storage-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); direction: rtl; text-align: left; }
 
 /* ---------- onboarding ---------- */
 .ob-wrap { max-width: 620px; margin: 5vh auto; text-align: center; }

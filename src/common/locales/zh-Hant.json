@@ -102,6 +102,10 @@
   "settings.flavorCpu": "CPU（所有電腦皆可）",
   "settings.flavorCuda": "NVIDIA GPU（CUDA，約需下載 440 MB）",
   "settings.installEngine": "安裝／重新安裝引擎",
+  "settings.storage": "引擎與模型存放位置",
+  "settings.change": "變更…",
+  "settings.openFolder": "開啟資料夾",
+  "settings.storageMoveError": "移動存放資料夾失敗",
 
   "settings.ai": "AI 功能（選用）",
   "settings.aiDesc": "摘要、標題與問答可連接任何 OpenAI 相容端點。指向本機的 Ollama 或 LM Studio 即可保持完全離線。",
@@ -130,6 +134,7 @@
   "models.use": "使用",
   "models.delete": "刪除",
   "models.download": "下載",
+  "models.downloading": "下載中…",
   "models.downloadError": "模型下載失敗",
   "models.tier.fastest": "最快，草稿品質",
   "models.tier.fast": "快速，日常筆記",

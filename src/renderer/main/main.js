@@ -65,6 +65,9 @@ function renderEngineStatus() {
   else if (st === 'ready') label.textContent = engineState.currentModel || 'ready';
   else label.textContent = t(`engine.${st}`) || st;
   $('#engine-status-text').textContent = `${st}${engineState.serverDetail ? ` — ${engineState.serverDetail.split('\n')[0].slice(0, 80)}` : ''} (whisper.cpp ${engineState.whisperCppVersion})`;
+  $('#storage-path').textContent = engineState.storageDir || '';
+  $('#storage-path').title = engineState.storageDir || '';
+  $('#btn-install-engine').disabled = (engineState.activeDownloads || []).some((k) => k.startsWith('engine:'));
   $('#hotkey-hint').innerHTML = t('footer.hint').replace('{key}', `<kbd>${hotkeyLabel()}</kbd>`);
   $('#ph-line1').innerHTML = t('notes.placeholder1').replace('{key}', `<kbd>${hotkeyLabel()}</kbd>`);
 }
@@ -564,11 +567,27 @@ $('#btn-install-engine').addEventListener('click', async () => {
     engineState = await wp.installEngine($('#set-engineFlavor').value);
   } catch (err) {
     alert(t('engine.installError') + '\n' + String(err.message || err));
+    engineState = await wp.engineState();
   }
   $('#btn-install-engine').disabled = false;
   renderEngineStatus();
   renderModelCards();
 });
+
+$('#btn-storage-change').addEventListener('click', async () => {
+  const btn = $('#btn-storage-change');
+  btn.disabled = true;
+  try {
+    const st = await wp.chooseStorage();
+    if (st) engineState = st;
+  } catch (err) {
+    alert(t('settings.storageMoveError') + '\n' + String(err.message || err));
+  }
+  btn.disabled = false;
+  renderEngineStatus();
+  renderModelCards();
+});
+$('#btn-storage-open').addEventListener('click', () => wp.openStorage());
 
 function renderModelCards() {
   for (const { wrapSel, subset } of [
@@ -581,17 +600,20 @@ function renderModelCards() {
     for (const m of engineState.models || []) {
       if (subset && !subset.includes(m.id)) continue;
       const selected = settings.model === m.id;
+      const downloading = (engineState.activeDownloads || []).includes(`model:${m.id}`);
       const card = document.createElement('div');
       card.className = 'model-card' + (selected ? ' selected' : '');
       card.innerHTML = `
         <div class="mc-name">${m.id}${m.tier === 'recommended' ? `<span class="mc-badge">${t('models.recommended')}</span>` : ''}</div>
         <div class="mc-info">${m.sizeMB} MB · RAM ${m.ram} · ${t(`models.tier.${m.tier}`)}</div>
-        <div class="progress" data-prog="model:${m.id}" hidden><div class="bar"></div><span class="pct"></span></div>
+        <div class="progress" data-prog="model:${m.id}" ${downloading ? '' : 'hidden'}><div class="bar"></div><span class="pct"></span></div>
         <div class="mc-actions">
-          ${m.installed
-    ? `${selected ? `<span class="mc-badge">${t('models.inUse')}</span>` : `<button class="btn" data-act="use">${t('models.use')}</button>`}
+          ${downloading
+    ? `<span class="mc-badge">${t('models.downloading')}</span><button class="btn" data-act="cancel">${t('job.cancel')}</button>`
+    : m.installed
+      ? `${selected ? `<span class="mc-badge">${t('models.inUse')}</span>` : `<button class="btn" data-act="use">${t('models.use')}</button>`}
              <button class="btn danger" data-act="del">${t('models.delete')}</button>`
-    : `<button class="btn" data-act="dl">${t('models.download')}</button>`}
+      : `<button class="btn" data-act="dl">${t('models.download')}</button>`}
         </div>`;
       card.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', async () => {
         if (b.dataset.act === 'use') {
@@ -600,16 +622,20 @@ function renderModelCards() {
         } else if (b.dataset.act === 'del') {
           engineState = await wp.deleteModel(m.id);
           renderModelCards();
+        } else if (b.dataset.act === 'cancel') {
+          await wp.cancelDownload(`model:${m.id}`);
         } else if (b.dataset.act === 'dl') {
           b.disabled = true;
           card.querySelector('.progress').hidden = false;
           try {
             engineState = await wp.downloadModel(m.id);
-            if (!settings.model || !engineState.models.find((x) => x.id === settings.model && x.installed)) {
-              settings = await wp.setSettings({ model: m.id });
-            }
+            // downloading a model means you want to use it
+            settings = await wp.setSettings({ model: m.id });
           } catch (err) {
-            alert(t('models.downloadError') + '\n' + String(err.message || err));
+            if (!String(err.message || err).includes('cancelled')) {
+              alert(t('models.downloadError') + '\n' + String(err.message || err));
+            }
+            engineState = await wp.engineState();
           }
           renderModelCards();
           renderObState();

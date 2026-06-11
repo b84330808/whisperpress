@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('wp', {
   deleteModel: (id) => ipcRenderer.invoke('engine:deleteModel', id),
   cancelDownload: (key) => ipcRenderer.invoke('engine:cancelDownload', key),
   restartEngine: () => ipcRenderer.invoke('engine:restart'),
+  chooseStorage: () => ipcRenderer.invoke('storage:choose'),
+  setStorage: (dir) => ipcRenderer.invoke('storage:set', dir),
+  openStorage: () => ipcRenderer.invoke('storage:open'),
 
   listNotes: () => ipcRenderer.invoke('notes:list'),
   getNote: (id) => ipcRenderer.invoke('notes:get', id),

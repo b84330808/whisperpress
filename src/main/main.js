@@ -125,6 +125,16 @@ function bootstrap() {
   ipcMain.handle('engine:deleteModel', (e, id) => { engine.deleteModel(id); return engine.getState(); });
   ipcMain.handle('engine:cancelDownload', (e, key) => engine.cancelDownload(key));
   ipcMain.handle('engine:restart', () => engine.start());
+  ipcMain.handle('storage:choose', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(windows.main, {
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: engine.getState().storageDir,
+    });
+    if (canceled || !filePaths[0]) return null;
+    return engine.setStorageDir(filePaths[0]);
+  });
+  ipcMain.handle('storage:set', (e, dir) => engine.setStorageDir(dir));
+  ipcMain.handle('storage:open', () => shell.openPath(engine.getState().storageDir));
 
   // ---------------- IPC: notes ----------------
   ipcMain.handle('notes:list', () => notes.list().map((n) => ({
