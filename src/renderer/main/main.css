@@ -160,6 +160,7 @@ input.switch:checked::after { left: 19px; background: #fff; }
 .group { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin: 16px 0; }
 .row { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
 .row > label:first-child { width: 190px; flex: none; color: var(--text); font-size: 13.5px; }
+.row .btn, .row .mc-badge, #flavor-status { white-space: nowrap; flex: none; }
 .row.col { flex-direction: column; align-items: flex-start; }
 .row.col textarea { width: 100%; }
 .center-row { justify-content: center; }

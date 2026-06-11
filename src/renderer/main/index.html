@@ -203,10 +203,11 @@
         <div class="row">
           <label data-i18n="settings.flavor"></label>
           <select id="set-engineFlavor">
-            <option value="cpu" data-i18n="settings.flavorCpu"></option>
-            <option value="cuda" data-i18n="settings.flavorCuda"></option>
+            <option value="cpu"></option>
+            <option value="cuda"></option>
           </select>
-          <button id="btn-install-engine" class="btn" data-i18n="settings.installEngine"></button>
+          <span id="flavor-status" class="small"></span>
+          <button id="btn-install-engine" class="btn"></button>
         </div>
         <div id="engine-install-progress" class="progress" hidden><div class="bar"></div><span class="pct"></span></div>
         <div class="row">

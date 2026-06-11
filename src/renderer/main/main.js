@@ -67,7 +67,29 @@ function renderEngineStatus() {
   $('#engine-status-text').textContent = `${st}${engineState.serverDetail ? ` — ${engineState.serverDetail.split('\n')[0].slice(0, 80)}` : ''} (whisper.cpp ${engineState.whisperCppVersion})`;
   $('#storage-path').textContent = engineState.storageDir || '';
   $('#storage-path').title = engineState.storageDir || '';
-  $('#btn-install-engine').disabled = (engineState.activeDownloads || []).some((k) => k.startsWith('engine:'));
+  renderFlavorRow();
+}
+
+// compute-flavor row: show per-flavor install state, only offer install when missing
+function renderFlavorRow() {
+  const sel = $('#set-engineFlavor');
+  const flavors = engineState.flavors || {};
+  const labels = { cpu: t('settings.flavorCpu'), cuda: t('settings.flavorCuda') };
+  for (const opt of sel.options) {
+    opt.textContent = labels[opt.value] + (flavors[opt.value] ? ` — ✓ ${t('settings.installed')}` : '');
+  }
+  const selected = sel.value || settings.engineFlavor;
+  const installed = !!flavors[selected];
+  const installing = (engineState.activeDownloads || []).some((k) => k.startsWith('engine:'));
+  const status = $('#flavor-status');
+  status.textContent = installing ? t('models.downloading')
+    : installed ? `✓ ${t('settings.installed')}`
+      : t('settings.notInstalledSize', { mb: selected === 'cuda' ? 440 : 16 });
+  status.style.color = installed && !installing ? 'var(--ok)' : 'var(--muted)';
+  const btn = $('#btn-install-engine');
+  btn.textContent = installed ? t('settings.reinstall') : t('settings.installNow');
+  btn.classList.toggle('primary', !installed);
+  btn.disabled = installing;
   $('#hotkey-hint').innerHTML = t('footer.hint').replace('{key}', `<kbd>${hotkeyLabel()}</kbd>`);
   $('#ph-line1').innerHTML = t('notes.placeholder1').replace('{key}', `<kbd>${hotkeyLabel()}</kbd>`);
 }

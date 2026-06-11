@@ -68,6 +68,10 @@ class Engine extends EventEmitter {
     return {
       whisperCppVersion: WHISPER_CPP_VERSION,
       engineInstalled: !!this.findExe('whisper-server.exe', flavor),
+      flavors: {
+        cpu: !!this.findExe('whisper-server.exe', 'cpu'),
+        cuda: !!this.findExe('whisper-server.exe', 'cuda'),
+      },
       flavor,
       models: MODELS.map((m) => ({ ...m, installed: fs.existsSync(this.modelPath(m.id)) })),
       currentModel: config.get().model,
