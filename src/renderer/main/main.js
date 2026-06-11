@@ -552,7 +552,14 @@ function afterSettingsChange(key) {
   renderEngineStatus();
   if (key === 'locale') reloadDict();
   if (key === 'hotkeyMode') $('#row-taplock').style.display = settings.hotkeyMode === 'hold' ? '' : 'none';
+  if (key === 'language') updateChineseVariantRow();
   if (key === 'enabled' && currentNoteId) openNote(currentNoteId);
+}
+
+// the Chinese-script option only matters when Chinese can be spoken (zh or auto-detect)
+function updateChineseVariantRow() {
+  const lang = settings.language || 'auto';
+  $('#row-chinese-variant').style.display = lang === 'zh' || lang === 'auto' ? '' : 'none';
 }
 function fillSettingsForm() {
   $('#btn-hotkey').textContent = hotkeyLabel();
@@ -566,6 +573,7 @@ function fillSettingsForm() {
   $('#set-saveAudio').checked = settings.saveAudio;
   $('#set-translate').checked = settings.translate;
   $('#set-chineseVariant').value = settings.chineseVariant || 'auto';
+  updateChineseVariantRow();
   $('#set-initialPrompt').value = settings.initialPrompt;
   $('#set-engineFlavor').value = settings.engineFlavor;
   $('#set-locale').value = settings.locale;
