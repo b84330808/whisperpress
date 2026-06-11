@@ -45,7 +45,7 @@
 需要 Windows 10/11 與 [Node.js](https://nodejs.org) 20+。
 
 ```powershell
-git clone <this-repo>
+git clone https://github.com/b84330808/whisperpress.git
 cd whisperpress
 npm install
 npm start

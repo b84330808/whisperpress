@@ -45,7 +45,7 @@ Press and hold a hotkey (default **F9**), talk, release — your speech is trans
 Requires [Node.js](https://nodejs.org) 20+ on Windows 10/11.
 
 ```powershell
-git clone <this-repo>
+git clone https://github.com/b84330808/whisperpress.git
 cd whisperpress
 npm install
 npm start
