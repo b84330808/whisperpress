@@ -73,13 +73,24 @@ function renderEngineStatus() {
   updateHwApply();
 }
 
-// compute-flavor row: show per-flavor install state, only offer install when missing
+// compute-flavor row: show detected hardware names and per-flavor install state
+function shortHwName(s) {
+  return (s || '').replace(/\((R|TM)\)/gi, '').replace(/\s*CPU\s*@.*$/i, '').replace(/^NVIDIA\s+/i, '').replace(/\s+/g, ' ').trim();
+}
 function renderFlavorRow() {
   const sel = $('#set-engineFlavor');
   const flavors = engineState.flavors || {};
   const labels = { cpu: t('settings.flavorCpu'), cuda: t('settings.flavorCuda') };
+  if (hwInfo) {
+    labels.cpu = t('settings.flavorCpuNamed', { name: shortHwName(hwInfo.cpuName) });
+    labels.cuda = hwInfo.gpu
+      ? t('settings.flavorCudaNamed', { name: shortHwName(hwInfo.gpu.name) })
+      : `${t('settings.flavorCuda')} — ${t('settings.noNvidia')}`;
+  }
   for (const opt of sel.options) {
     opt.textContent = labels[opt.value];
+    // no NVIDIA GPU -> CUDA engine cannot run; block selecting it (unless already selected)
+    if (opt.value === 'cuda') opt.disabled = !!(hwInfo && !hwInfo.gpu && settings.engineFlavor !== 'cuda');
   }
   const selected = sel.value || settings.engineFlavor;
   const installed = !!flavors[selected];
@@ -676,6 +687,7 @@ async function loadHwRecommendation() {
   $('#ob-hw').textContent = `💻 ${line}`;
   updateHwApply();
   renderModelCards(); // show the hardware badge on the recommended card
+  renderFlavorRow(); // show detected hardware names in the compute dropdown
 }
 function updateHwApply() {
   if (!hwInfo) return;
