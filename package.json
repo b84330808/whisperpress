@@ -1,7 +1,7 @@
 {
   "name": "whisperpress",
   "productName": "WhisperPress",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Hold a key, speak, and watch your words appear — fully offline voice typing & voice notes for Windows, powered by Whisper.",
   "main": "src/main/main.js",
   "author": "WhisperPress contributors",
