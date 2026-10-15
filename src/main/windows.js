@@ -83,6 +83,7 @@ function createOverlayWindow() {
 // Commands wait for the overlay page to load, so none are lost on a freshly created window.
 function sendOverlay(payload) {
   const w = createOverlayWindow();
+  if (!w.webContents.isLoading()) { w.webContents.send('overlay:cmd', payload); return; }
   const ready = overlayReady;
   ready.then(() => { if (!w.isDestroyed()) w.webContents.send('overlay:cmd', payload); });
 }
