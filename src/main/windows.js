@@ -6,6 +6,7 @@ const config = require('./config');
 const ROOT = path.join(__dirname, '..', '..');
 let mainWindow = null;
 let overlayWindow = null;
+let overlayReady = Promise.resolve();
 
 function setupSession() {
   const ses = session.defaultSession;
@@ -49,7 +50,7 @@ function createMainWindow() {
 
 function createOverlayWindow() {
   if (overlayWindow && !overlayWindow.isDestroyed()) return overlayWindow;
-  overlayWindow = new BrowserWindow({
+  const w = new BrowserWindow({
     width: 380,
     height: 130,
     frame: false,
@@ -70,11 +71,21 @@ function createOverlayWindow() {
       backgroundThrottling: false,
     },
   });
-  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
-  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  overlayWindow.loadFile(path.join(ROOT, 'src', 'renderer', 'overlay', 'overlay.html'));
-  overlayWindow.on('closed', () => { overlayWindow = null; });
-  return overlayWindow;
+  w.setAlwaysOnTop(true, 'screen-saver');
+  w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  overlayReady = new Promise((resolve) => w.webContents.once('did-finish-load', resolve));
+  w.loadFile(path.join(ROOT, 'src', 'renderer', 'overlay', 'overlay.html'));
+  w.on('closed', () => { if (overlayWindow === w) overlayWindow = null; });
+  overlayWindow = w;
+  return w;
+}
+
+// Commands wait for the overlay page to load, so none are lost on a freshly created window.
+function sendOverlay(payload) {
+  const w = createOverlayWindow();
+  if (!w.webContents.isLoading()) { w.webContents.send('overlay:cmd', payload); return; }
+  const ready = overlayReady;
+  ready.then(() => { if (!w.isDestroyed()) w.webContents.send('overlay:cmd', payload); });
 }
 
 function showOverlay() {
@@ -89,8 +100,16 @@ function showOverlay() {
   });
   if (!w.isVisible()) w.showInactive();
 }
+// On Windows a long-lived transparent overlay can silently stop presenting frames: the page
+// keeps rendering but nothing reaches the screen, and only a new window recovers. So each
+// used overlay is replaced by a fresh (hidden, preloaded) one once it hides.
 function hideOverlay() {
-  if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) overlayWindow.hide();
+  if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) return;
+  const used = overlayWindow;
+  used.hide();
+  overlayWindow = null;
+  used.destroy();
+  createOverlayWindow();
 }
 
 function showMain(view) {
@@ -113,6 +132,7 @@ module.exports = {
   createOverlayWindow,
   showOverlay,
   hideOverlay,
+  sendOverlay,
   showMain,
   broadcast,
   get main() { return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null; },

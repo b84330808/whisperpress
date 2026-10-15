@@ -33,8 +33,7 @@ class Dictation extends EventEmitter {
   }
 
   _overlay(cmd, data) {
-    const w = windows.overlay;
-    if (w) w.webContents.send('overlay:cmd', { cmd, ...data });
+    windows.sendOverlay({ cmd, ...data });
   }
 
   start() {
