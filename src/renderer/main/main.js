@@ -452,12 +452,115 @@ function renderJobs() {
 }
 
 // ---------------- meeting ----------------
-const meeting = { active: false, ctx: null, streams: [], chunks: [], levels: [], startedAt: 0, raf: 0, timerInt: 0 };
+const meeting = { active: false, ctx: null, streams: [], chunks: [], levels: [], startedAt: 0, raf: 0, timerInt: 0, withMic: false, live: null, liveInt: 0 };
+
+// Live captions: the stream is cut at natural pauses (or every liveCaptionSec) and each piece
+// goes to the warm server. One request at a time — on a slow machine pieces just get longer.
+// The note itself still comes from the full-length pass after stopping.
+const LIVE = { hardMaxSec: 28, pauseMs: 400, silence: 0.008 };
+// the slider sets the longest piece; a pause may cut from half of it on
+function liveMaxSec() { return Math.min(20, Math.max(2, Number(settings.liveCaptionSec) || 12)); }
+
+function renderLiveRate() {
+  $('#meet-rate').value = liveMaxSec();
+  $('#meet-rate-val').textContent = t('meeting.liveRateValue').replace('{n}', $('#meet-rate').value);
+}
+$('#meet-rate').addEventListener('input', () => {
+  $('#meet-rate-val').textContent = t('meeting.liveRateValue').replace('{n}', $('#meet-rate').value);
+});
+$('#meet-rate').addEventListener('change', async () => {
+  settings = await wp.setSettings({ liveCaptionSec: Number($('#meet-rate').value) });
+  renderLiveRate();
+});
+
+function concatPcm(chunks) {
+  const pcm = new Float32Array(chunks.reduce((a, c) => a + c.length, 0));
+  let off = 0;
+  for (const c of chunks) { pcm.set(c, off); off += c.length; }
+  return pcm;
+}
+function rms(chunks, fromEnd = Infinity) {
+  let sum = 0, n = 0;
+  for (let i = chunks.length - 1; i >= 0 && n < fromEnd; i--) {
+    const c = chunks[i];
+    for (let j = c.length - 1; j >= 0 && n < fromEnd; j--, n++) sum += c[j] * c[j];
+  }
+  return n ? Math.sqrt(sum / n) : 0;
+}
+// whisper invents text (video outros, subtitle credits, random English) for silence, so
+// audio is cut to 0.5 s around the first and last sound. Returns [from, to], or null if silent.
+function voicedRange(pcm, pad = 8000) {
+  const win = 1600; // 100 ms
+  const quiet = (at) => {
+    let sum = 0;
+    for (let i = at; i < at + win; i++) sum += pcm[i] * pcm[i];
+    return Math.sqrt(sum / win) < LIVE.silence;
+  };
+  let from = 0;
+  while (from + win <= pcm.length && quiet(from)) from += win;
+  let to = pcm.length;
+  while (to - win >= from && quiet(to - win)) to -= win;
+  if (from + win > to) return null;
+  return [Math.max(0, from - pad), Math.min(pcm.length, to + pad)];
+}
+// a recording that ends quiet is cut after the last sound; the start stays, so times still match
+function trimTrailingSilence(pcm) {
+  const r = voicedRange(pcm);
+  return r ? pcm.subarray(0, r[1]) : pcm;
+}
+const fmtClock = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+function liveTick() {
+  const lv = meeting.live;
+  if (!meeting.active || !lv || lv.busy || lv.failed) return;
+  const sec = lv.len / 16000;
+  const maxSec = liveMaxSec();
+  if (sec < maxSec / 2) return;
+  const paused = rms(lv.buf, (LIVE.pauseMs / 1000) * 16000) < LIVE.silence;
+  if (!paused && sec < maxSec) return;
+  let pcm = concatPcm(lv.buf);
+  if (pcm.length > LIVE.hardMaxSec * 16000) pcm = pcm.subarray(pcm.length - LIVE.hardMaxSec * 16000); // fell behind: keep the latest
+  const offset = lv.len - pcm.length;
+  const posMs = lv.posMs;
+  lv.posMs += Math.round(sec * 1000);
+  lv.buf = []; lv.len = 0;
+  const range = voicedRange(pcm, 4800);
+  if (!range) return; // nothing said
+  const startMs = posMs + Math.round(((offset + range[0]) / 16000) * 1000);
+  lv.busy = true;
+  wp.transcribeLive(encodeWav(pcm.subarray(range[0], range[1]))).then((text) => {
+    if (meeting.live !== lv || !text) return;
+    const box = $('#meet-transcript');
+    const stick = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
+    const line = document.createElement('div');
+    line.className = 'lt-line';
+    line.innerHTML = '<span class="lt-time"></span><span></span>';
+    line.firstChild.textContent = fmtClock(startMs);
+    line.lastChild.textContent = text;
+    box.appendChild(line);
+    if (stick) box.scrollTop = box.scrollHeight;
+  }).catch(() => {
+    if (meeting.live !== lv) return;
+    lv.failed = true; // e.g. no model yet: the recording itself continues
+    $('#meet-notice').textContent = [$('#meet-notice').textContent, t('meeting.liveError')].filter(Boolean).join(' ');
+    $('#meet-notice').hidden = false;
+  }).finally(() => { lv.busy = false; });
+}
+
+function renderMeetSource() {
+  const src = settings.meetingSource === 'system' ? 'system' : 'both';
+  $$('#meet-source button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.source === src)));
+}
+$$('#meet-source button').forEach((b) => b.addEventListener('click', async () => {
+  settings = await wp.setSettings({ meetingSource: b.dataset.source });
+  renderMeetSource();
+}));
 
 $('#btn-meet-start').addEventListener('click', async () => {
   try {
     const sys = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
     meeting.streams.push(sys);
+    const hasSystemAudio = sys.getAudioTracks().length > 0;
     const ctx = new AudioContext({ sampleRate: 16000 });
     meeting.ctx = ctx;
     await ctx.audioWorklet.addModule('../common/pcm-worklet.js');
@@ -468,6 +571,7 @@ $('#btn-meet-start').addEventListener('click', async () => {
     node.port.onmessage = (e) => {
       if (!meeting.active) return;
       meeting.chunks.push(e.data);
+      if (meeting.live) { meeting.live.buf.push(e.data); meeting.live.len += e.data.length; }
       for (let i = 0; i < e.data.length; i++) acc.sum += e.data[i] * e.data[i];
       acc.n += e.data.length;
       const now = performance.now();
@@ -477,14 +581,30 @@ $('#btn-meet-start').addEventListener('click', async () => {
         acc.sum = 0; acc.n = 0; acc.last = now;
       }
     };
-    if (sys.getAudioTracks().length) ctx.createMediaStreamSource(sys).connect(node);
-    if ($('#meet-mic').checked) {
-      const micCfg = settings.micDeviceId && settings.micDeviceId !== 'default' ? { deviceId: { exact: settings.micDeviceId } } : {};
-      const mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, ...micCfg } });
-      meeting.streams.push(mic);
-      ctx.createMediaStreamSource(mic).connect(node);
+    if (hasSystemAudio) ctx.createMediaStreamSource(sys).connect(node);
+    meeting.withMic = false;
+    let notice = '';
+    if (settings.meetingSource !== 'system') {
+      // a missing or unplugged mic must not cost the system audio: fall back to system-only
+      try {
+        const micCfg = settings.micDeviceId && settings.micDeviceId !== 'default' ? { deviceId: { exact: settings.micDeviceId } } : {};
+        const mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, ...micCfg } });
+        meeting.streams.push(mic);
+        ctx.createMediaStreamSource(mic).connect(node);
+        meeting.withMic = true;
+      } catch {
+        if (!hasSystemAudio) throw new Error(t('meeting.noAudio'));
+        notice = t('meeting.micFallback');
+      }
     }
+    if (!hasSystemAudio && !meeting.withMic) throw new Error(t('meeting.noAudio'));
+    $('#meet-notice').textContent = notice;
+    $('#meet-notice').hidden = !notice;
     sys.getVideoTracks()[0]?.addEventListener('ended', stopMeeting); // user clicked "stop sharing"
+    meeting.live = { buf: [], len: 0, posMs: 0, busy: false, failed: false };
+    $('#meet-transcript').innerHTML = '';
+    $('#meet-transcript').dataset.empty = t('meeting.listening');
+    meeting.liveInt = setInterval(liveTick, 250);
     meeting.active = true;
     meeting.startedAt = Date.now();
     $('#meeting-idle').hidden = true;
@@ -518,6 +638,8 @@ async function stopMeeting(discard = false) {
   if (!meeting.active && !meeting.streams.length) return;
   meeting.active = false;
   clearInterval(meeting.timerInt);
+  clearInterval(meeting.liveInt);
+  meeting.live = null;
   cancelAnimationFrame(meeting.raf);
   await new Promise((r) => setTimeout(r, 150));
   for (const s of meeting.streams) for (const tr of s.getTracks()) tr.stop();
@@ -526,14 +648,11 @@ async function stopMeeting(discard = false) {
   $('#meeting-idle').hidden = false;
   $('#meeting-live').hidden = true;
   $('#meet-timer').textContent = '0:00';
-  const total = meeting.chunks.reduce((a, c) => a + c.length, 0);
-  if (discard === true || total < 16000) { meeting.chunks = []; return; }
-  const pcm = new Float32Array(total);
-  let off = 0;
-  for (const c of meeting.chunks) { pcm.set(c, off); off += c.length; }
+  const pcm = trimTrailingSilence(concatPcm(meeting.chunks));
   meeting.chunks = [];
+  if (discard === true || pcm.length < 16000) return;
   const durationMs = Math.round((pcm.length / 16000) * 1000);
-  const name = `${t('meeting.noteTitle')} ${new Date().toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+  const name = `${t(meeting.withMic ? 'meeting.noteTitle' : 'meeting.noteTitleSystem')} ${new Date().toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   await wp.startTranscription({ name, wav: encodeWav(pcm), durationMs, source: 'meeting', keepAudio: true });
 }
 $('#btn-meet-stop').addEventListener('click', () => stopMeeting());
@@ -583,6 +702,8 @@ function fillSettingsForm() {
   $('#set-chineseVariant').value = settings.chineseVariant || 'auto';
   updateChineseVariantRow();
   $('#set-initialPrompt').value = settings.initialPrompt;
+  renderMeetSource();
+  renderLiveRate();
   $('#set-codingMode').value = settings.codingMode || 'off';
   $('#set-codingPressEnter').checked = !!settings.codingPressEnter;
   $('#set-codingVocabulary').value = settings.codingVocabulary || '';

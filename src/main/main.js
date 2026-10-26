@@ -20,6 +20,7 @@ function bootstrap() {
   const dictation = require('./dictation');
   const notes = require('./notes');
   const jobs = require('./jobs');
+  const { isHallucination } = require('./hallucinations');
   const ai = require('./ai');
 
   app.isQuitting = false;
@@ -211,6 +212,11 @@ function bootstrap() {
     name, wavBuffer: Buffer.from(wav), durationMs, source, keepAudio, language,
   }));
   ipcMain.handle('transcribe:cancel', (e, id) => jobs.cancel(id));
+  // live captions while a meeting records: short clips on the warm server
+  ipcMain.handle('transcribe:live', async (e, wav) => {
+    const text = dictation.cleanTranscript((await engine.transcribe(Buffer.from(wav))).text);
+    return isHallucination(text) ? '' : text;
+  });
 
   // ---------------- IPC: AI ----------------
   ipcMain.handle('ai:test', async () => {

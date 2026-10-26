@@ -176,3 +176,4 @@ class Dictation extends EventEmitter {
 }
 
 module.exports = new Dictation();
+module.exports.cleanTranscript = cleanTranscript;

@@ -121,7 +121,10 @@
       <p class="muted" data-i18n="meeting.desc"></p>
       <div class="meeting-card">
         <div id="meeting-idle">
-          <label class="check-row"><input id="meet-mic" type="checkbox" checked /> <span data-i18n="meeting.includeMic"></span></label>
+          <div id="meet-source" class="seg" role="radiogroup">
+            <button type="button" data-source="both" role="radio" data-i18n="meeting.sourceBoth"></button>
+            <button type="button" data-source="system" role="radio" data-i18n="meeting.sourceSystem"></button>
+          </div>
           <button id="btn-meet-start" class="btn record" data-i18n="meeting.start"></button>
         </div>
         <div id="meeting-live" hidden>
@@ -130,7 +133,15 @@
             <span id="meet-timer">0:00</span>
             <canvas id="meet-levels" width="220" height="36"></canvas>
           </div>
+          <p id="meet-notice" class="muted small" hidden></p>
+          <div id="meet-transcript" class="live-transcript"></div>
           <button id="btn-meet-stop" class="btn danger" data-i18n="meeting.stop"></button>
+        </div>
+        <div class="live-rate">
+          <label for="meet-rate" data-i18n="meeting.liveRate"></label>
+          <input id="meet-rate" type="range" min="2" max="20" step="1" />
+          <span id="meet-rate-val"></span>
+          <span class="muted small" data-i18n="meeting.liveRateHint"></span>
         </div>
         <p id="meeting-tip" class="muted small" data-i18n="meeting.tip"></p>
       </div>
