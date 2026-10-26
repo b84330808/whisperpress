@@ -46,7 +46,24 @@ Press and hold a hotkey (default **F9**), talk, release — your speech is trans
 | ⏱ **Timestamped export** | Export notes as `.txt`, `.md`, or `.srt` subtitles. |
 | 🔒 **Private by architecture** | Models run on your CPU/GPU via whisper.cpp. Notes are plain JSON on your disk. |
 | 🪶 **Custom vocabulary** | Initial-prompt hints for names, jargon, and output style. |
+| 🧑‍💻 **Coding mode** | Dictate into Windows Terminal, VS Code or Claude Code: mixed Chinese/Japanese/English speech, a code vocabulary (`use effect` → `useEffect`), and Enter only if you want it. |
 | 💻 **Hardware-aware setup** | Detects your CPU / RAM / NVIDIA GPU and applies the best engine + model in one click. |
+
+## Coding mode
+
+For talking to a terminal, an editor or an AI coding agent such as Claude Code. Turn it on in *Settings → Coding mode*, or from the tray menu:
+
+- **Auto**: on whenever the window you're dictating into is a terminal or code editor (Windows Terminal, PowerShell, cmd, VS Code, Cursor, Windsurf, JetBrains IDEs, Android Studio, Visual Studio, Sublime Text, WezTerm, Alacritty…). Add other apps by process name, e.g. `Claude`.
+- **Always on**, or **Off** (the default).
+
+What changes while it's on (the overlay shows a `</> code` badge):
+
+- **Mixed languages.** Whisper gets a sample sentence in your UI language with English code terms in it, so "幫我跑 pytest，然後 git commit" or "npm install してから" keep the English words in Latin script.
+- **Code vocabulary.** A list of terms you say (`pytest, kubectl, useEffect, …`) biases Whisper toward those spellings and fixes case and spacing afterwards: `Pytest` → `pytest`, `use effect` → `useEffect`, `node js` → `Node.js`. Lines like `cube control => kubectl` replace what Whisper heard with what you meant. Paths, URLs and flags (`package.json`, `github.com/…`, `--use-effect`) are left alone.
+- **No sentence-final period**, so `git status` doesn't arrive as `git status.`.
+- **Enter is up to you.** By default the text is inserted and you press Enter after checking it. Turn on *Press Enter after inserting* to run the command or send the prompt hands-free.
+
+Still fully offline: the vocabulary is only a prompt for the local model. Terminals running as administrator can't receive input from a normal app (a Windows rule); run WhisperPress as admin too if you need that.
 
 ## Download
 

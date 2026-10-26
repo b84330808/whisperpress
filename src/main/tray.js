@@ -14,10 +14,23 @@ function iconPath(recording) {
 
 function buildMenu() {
   const hk = config.get().hotkey;
+  const codingMode = config.get().codingMode || 'off';
+  const codingItem = (value, key) => ({
+    label: t(key), type: 'radio', checked: codingMode === value,
+    click: () => config.set({ codingMode: value }),
+  });
   return Menu.buildFromTemplate([
     { label: t('tray.open'), click: () => windows.showMain() },
     { label: t('tray.hint', { key: (hk && hk.label) || 'F9' }), enabled: false },
     { type: 'separator' },
+    {
+      label: t('tray.codingMode'),
+      submenu: [
+        codingItem('off', 'settings.codingOff'),
+        codingItem('auto', 'settings.codingAuto'),
+        codingItem('on', 'settings.codingOn'),
+      ],
+    },
     { label: t('tray.settings'), click: () => windows.showMain('settings') },
     { type: 'separator' },
     { label: t('tray.quit'), click: () => { app.isQuitting = true; app.quit(); } },

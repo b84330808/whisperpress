@@ -13,6 +13,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "test": "node --test test/coding.test.js",
     "icons": "node scripts/gen-icons.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"

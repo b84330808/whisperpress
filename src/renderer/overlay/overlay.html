@@ -36,6 +36,8 @@
   #pill.state-transcribing #spin { display: block; }
   #pill.state-transcribing #msg, #pill.state-done #msg, #pill.state-error #msg, #pill.state-empty #msg { display: block; }
   #pill.state-done #icon, #pill.state-error #icon, #pill.state-empty #icon { display: block; }
+  #code { display: none; flex: none; font: 600 10.5px/1 Consolas, "Cascadia Mono", monospace; color: #c4b5fd; border: 1px solid rgba(167,139,250,.55); border-radius: 6px; padding: 3px 5px; }
+  #pill.coding #code { display: block; }
 </style>
 </head>
 <body>
@@ -43,6 +45,7 @@
     <div id="dot"></div>
     <canvas id="bars" width="192" height="68"></canvas>
     <div id="timer">0:00</div>
+    <div id="code"></div>
     <div id="hint"></div>
     <div id="spin"></div>
     <div id="icon"></div>

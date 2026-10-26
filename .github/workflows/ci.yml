@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      # the tests don't start Electron, so skip its ~100 MB binary download
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Syntax-check all app scripts
+        shell: bash
+        run: for f in $(git ls-files 'src/*.js'); do node --check "$f" || exit 1; done
+
+      - name: Locale files have the same keys
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const keys = (l) => Object.keys(JSON.parse(fs.readFileSync('src/common/locales/' + l + '.json', 'utf8'))).sort().join();
+            const en = keys('en');
+            for (const l of ['ja', 'zh-Hant']) if (keys(l) !== en) { console.error(l + '.json keys differ from en.json'); process.exit(1); }
+          "
+
+      - run: npm test

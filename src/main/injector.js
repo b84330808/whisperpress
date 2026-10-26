@@ -22,6 +22,9 @@ public class WPInput {
   static INPUT Mk(ushort vk, ushort scan, uint flags) { var i = new INPUT(); i.type = 1; i.U.ki.wVk = vk; i.U.ki.wScan = scan; i.U.ki.dwFlags = flags; return i; }
   public static uint Key(ushort vk, bool up) { var a = new INPUT[]{ Mk(vk, 0, up ? 2u : 0u) }; return SendInput(1, a, Marshal.SizeOf(typeof(INPUT))); }
   public static uint Chr(ushort cu) { var a = new INPUT[]{ Mk(0, cu, 4u), Mk(0, cu, 6u) }; return SendInput(2, a, Marshal.SizeOf(typeof(INPUT))); }
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+  public static uint FgPid() { uint pid; GetWindowThreadProcessId(GetForegroundWindow(), out pid); return pid; }
 }
 "@
 while ($true) {
@@ -30,17 +33,7 @@ while ($true) {
   # tolerate any leading garbage (e.g. a BOM mis-decoded by the console codepage)
   $typeIdx = $line.IndexOf('TYPE ')
   try {
-    if ($line.Contains('PASTE')) {
-      $sent = [uint32]0
-      $sent += [WPInput]::Key(0x11, $false)   # Ctrl down
-      Start-Sleep -Milliseconds 15
-      $sent += [WPInput]::Key(0x56, $false)   # V down
-      Start-Sleep -Milliseconds 15
-      $sent += [WPInput]::Key(0x56, $true)
-      $sent += [WPInput]::Key(0x11, $true)
-      if ($sent -eq 4) { [Console]::Out.WriteLine('OK') }
-      else { [Console]::Out.WriteLine("ERR SendInput injected $sent/4 events") }
-    } elseif ($typeIdx -ge 0) {
+    if ($typeIdx -ge 0) {
       $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line.Substring($typeIdx + 5).Trim()))
       $fail = [uint32]0
       foreach ($ch in $text.ToCharArray()) {
@@ -52,6 +45,23 @@ while ($true) {
       }
       if ($fail -eq 0) { [Console]::Out.WriteLine('OK') }
       else { [Console]::Out.WriteLine("ERR SendInput dropped $fail chars") }
+    } elseif ($line.Contains('PASTE')) {
+      $sent = [uint32]0
+      $sent += [WPInput]::Key(0x11, $false)   # Ctrl down
+      Start-Sleep -Milliseconds 15
+      $sent += [WPInput]::Key(0x56, $false)   # V down
+      Start-Sleep -Milliseconds 15
+      $sent += [WPInput]::Key(0x56, $true)
+      $sent += [WPInput]::Key(0x11, $true)
+      if ($sent -eq 4) { [Console]::Out.WriteLine('OK') }
+      else { [Console]::Out.WriteLine("ERR SendInput injected $sent/4 events") }
+    } elseif ($line.Contains('ENTER')) {
+      if (([WPInput]::Key(0x0D, $false) + [WPInput]::Key(0x0D, $true)) -eq 2) { [Console]::Out.WriteLine('OK') }
+      else { [Console]::Out.WriteLine('ERR SendInput dropped Enter') }
+    } elseif ($line.Contains('FGAPP')) {
+      # process name of the window that has focus, e.g. WindowsTerminal / Code
+      $p = Get-Process -Id ([WPInput]::FgPid()) -ErrorAction SilentlyContinue
+      if ($p) { [Console]::Out.WriteLine("OK $($p.ProcessName)") } else { [Console]::Out.WriteLine('OK ') }
     } else {
       [Console]::Out.WriteLine('ERR unknown command')
     }
@@ -83,7 +93,7 @@ class Injector {
         const line = buf.slice(0, i).trim();
         buf = buf.slice(i + 1);
         const p = this.pending.shift();
-        if (p) (line.startsWith('OK') ? p.resolve() : p.reject(new Error(line)));
+        if (p) (line.startsWith('OK') ? p.resolve(line.slice(2).trim()) : p.reject(new Error(line)));
       }
     });
     this.proc.on('exit', () => {
@@ -100,19 +110,20 @@ class Injector {
         if (idx >= 0) this.pending.splice(idx, 1);
         reject(new Error('injector timeout'));
       }, timeoutMs);
-      entry.resolve = () => { clearTimeout(t); resolve(); };
+      entry.resolve = (value) => { clearTimeout(t); resolve(value); };
       entry.reject = (e) => { clearTimeout(t); reject(e); };
       this.pending.push(entry);
       this.proc.stdin.write(cmd + '\n');
     });
   }
 
-  // mode: 'paste' | 'type'
-  async inject(text, { mode = 'paste', restoreClipboard = true } = {}) {
+  // mode: 'paste' | 'type'. pressEnter: hit Enter once the text has landed.
+  async inject(text, { mode = 'paste', restoreClipboard = true, pressEnter = false } = {}) {
     if (!text) return;
     if (mode === 'type') {
       const b64 = Buffer.from(text, 'utf8').toString('base64');
       await this._send(`TYPE ${b64}`, Math.max(15000, text.length * 8));
+      if (pressEnter) await this._enterAfter(60);
       return;
     }
     const prev = restoreClipboard ? clipboard.readText() : null;
@@ -123,6 +134,20 @@ class Injector {
       await new Promise((r) => setTimeout(r, 350)); // target app must read the clipboard first
       clipboard.writeText(prev || '');
     }
+    // terminals process a paste asynchronously; an Enter sent right after
+    // Ctrl+V can arrive before the pasted text
+    if (pressEnter) await this._enterAfter(restoreClipboard ? 0 : 350);
+  }
+  async _enterAfter(ms) {
+    if (ms) await new Promise((r) => setTimeout(r, ms));
+    await this._send('ENTER', 4000);
+  }
+  // Process name of the focused window ('' if unknown), e.g. 'WindowsTerminal'.
+  // Asked when recording starts and only awaited after it ends, so a generous
+  // timeout costs nothing; a reply arriving after a timeout would otherwise be
+  // matched to the next command.
+  async foregroundApp() {
+    try { return (await this._send('FGAPP', 5000)) || ''; } catch { return ''; }
   }
   warmup() { try { this._ensure(); } catch (e) { console.error('injector warmup failed', e); } }
   kill() { if (this.proc) { try { this.proc.kill(); } catch { /* ignore */ } this.proc = null; } }
