@@ -454,10 +454,24 @@ function renderJobs() {
 // ---------------- meeting ----------------
 const meeting = { active: false, ctx: null, streams: [], chunks: [], levels: [], startedAt: 0, raf: 0, timerInt: 0, withMic: false, live: null, liveInt: 0 };
 
-// Live captions: the stream is cut at natural pauses (or every LIVE.maxSec) and each piece
+// Live captions: the stream is cut at natural pauses (or every liveCaptionSec) and each piece
 // goes to the warm server. One request at a time — on a slow machine pieces just get longer.
 // The note itself still comes from the full-length pass after stopping.
-const LIVE = { minSec: 3, maxSec: 12, hardMaxSec: 28, pauseMs: 400, silence: 0.008 };
+const LIVE = { hardMaxSec: 28, pauseMs: 400, silence: 0.008 };
+// the slider sets the longest piece; a pause may cut from half of it on
+function liveMaxSec() { return Math.min(20, Math.max(2, Number(settings.liveCaptionSec) || 12)); }
+
+function renderLiveRate() {
+  $('#meet-rate').value = liveMaxSec();
+  $('#meet-rate-val').textContent = t('meeting.liveRateValue').replace('{n}', $('#meet-rate').value);
+}
+$('#meet-rate').addEventListener('input', () => {
+  $('#meet-rate-val').textContent = t('meeting.liveRateValue').replace('{n}', $('#meet-rate').value);
+});
+$('#meet-rate').addEventListener('change', async () => {
+  settings = await wp.setSettings({ liveCaptionSec: Number($('#meet-rate').value) });
+  renderLiveRate();
+});
 
 function concatPcm(chunks) {
   const pcm = new Float32Array(chunks.reduce((a, c) => a + c.length, 0));
@@ -473,18 +487,26 @@ function rms(chunks, fromEnd = Infinity) {
   }
   return n ? Math.sqrt(sum / n) : 0;
 }
-// whisper invents text (video outros, subtitle credits) for long silence, so a recording
-// that ends quiet is cut 0.5 s after the last sound. The start stays, so times still match.
-function trimTrailingSilence(pcm) {
+// whisper invents text (video outros, subtitle credits, random English) for silence, so
+// audio is cut to 0.5 s around the first and last sound. Returns [from, to], or null if silent.
+function voicedRange(pcm, pad = 8000) {
   const win = 1600; // 100 ms
-  let end = pcm.length;
-  while (end > win) {
+  const quiet = (at) => {
     let sum = 0;
-    for (let i = end - win; i < end; i++) sum += pcm[i] * pcm[i];
-    if (Math.sqrt(sum / win) >= LIVE.silence) break;
-    end -= win;
-  }
-  return pcm.subarray(0, Math.min(pcm.length, end + 8000));
+    for (let i = at; i < at + win; i++) sum += pcm[i] * pcm[i];
+    return Math.sqrt(sum / win) < LIVE.silence;
+  };
+  let from = 0;
+  while (from + win <= pcm.length && quiet(from)) from += win;
+  let to = pcm.length;
+  while (to - win >= from && quiet(to - win)) to -= win;
+  if (from + win > to) return null;
+  return [Math.max(0, from - pad), Math.min(pcm.length, to + pad)];
+}
+// a recording that ends quiet is cut after the last sound; the start stays, so times still match
+function trimTrailingSilence(pcm) {
+  const r = voicedRange(pcm);
+  return r ? pcm.subarray(0, r[1]) : pcm;
 }
 const fmtClock = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
@@ -492,17 +514,21 @@ function liveTick() {
   const lv = meeting.live;
   if (!meeting.active || !lv || lv.busy || lv.failed) return;
   const sec = lv.len / 16000;
-  if (sec < LIVE.minSec) return;
+  const maxSec = liveMaxSec();
+  if (sec < maxSec / 2) return;
   const paused = rms(lv.buf, (LIVE.pauseMs / 1000) * 16000) < LIVE.silence;
-  if (!paused && sec < LIVE.maxSec) return;
+  if (!paused && sec < maxSec) return;
   let pcm = concatPcm(lv.buf);
   if (pcm.length > LIVE.hardMaxSec * 16000) pcm = pcm.subarray(pcm.length - LIVE.hardMaxSec * 16000); // fell behind: keep the latest
-  const startMs = lv.posMs + Math.round(((lv.len - pcm.length) / 16000) * 1000);
+  const offset = lv.len - pcm.length;
+  const posMs = lv.posMs;
   lv.posMs += Math.round(sec * 1000);
   lv.buf = []; lv.len = 0;
-  if (rms([pcm]) < LIVE.silence) return; // nothing said
+  const range = voicedRange(pcm, 4800);
+  if (!range) return; // nothing said
+  const startMs = posMs + Math.round(((offset + range[0]) / 16000) * 1000);
   lv.busy = true;
-  wp.transcribeLive(encodeWav(pcm)).then((text) => {
+  wp.transcribeLive(encodeWav(pcm.subarray(range[0], range[1]))).then((text) => {
     if (meeting.live !== lv || !text) return;
     const box = $('#meet-transcript');
     const stick = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
@@ -677,6 +703,7 @@ function fillSettingsForm() {
   updateChineseVariantRow();
   $('#set-initialPrompt').value = settings.initialPrompt;
   renderMeetSource();
+  renderLiveRate();
   $('#set-codingMode').value = settings.codingMode || 'off';
   $('#set-codingPressEnter').checked = !!settings.codingPressEnter;
   $('#set-codingVocabulary').value = settings.codingVocabulary || '';

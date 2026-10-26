@@ -162,6 +162,9 @@ input.switch:checked::after { left: 19px; background: #fff; }
 .seg button[aria-checked="true"] { background: var(--accent); color: #fff; }
 #meet-notice { margin-bottom: 12px; }
 #meeting-live { align-self: stretch; }
+.live-rate { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; }
+.live-rate input[type=range] { width: 200px; padding: 0; border: 0; background: transparent; accent-color: var(--accent); cursor: pointer; }
+#meet-rate-val { min-width: 4.5em; color: var(--accent2); font-variant-numeric: tabular-nums; }
 .live-transcript { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; max-height: 340px; min-height: 90px; overflow-y: auto; font-size: 14px; line-height: 1.65; }
 .live-transcript:empty::before { content: attr(data-empty); color: var(--muted); font-size: 13px; }
 .lt-line { display: flex; gap: 10px; }

@@ -80,6 +80,9 @@
   "meeting.noAudio": "使える音源がありません：システム音声を取得できず、マイクも見つかりません。",
   "meeting.listening": "聞き取り中… 話し始めるとここに字幕がリアルタイムで表示されます。",
   "meeting.liveError": "リアルタイム字幕を利用できません（モデルはインストール済みですか？）— 録音は続きます。",
+  "meeting.liveRate": "字幕の更新",
+  "meeting.liveRateValue": "約 {n} 秒ごと",
+  "meeting.liveRateHint": "短いほど速く、長いほど正確になります。",
   "meeting.noteTitle": "会議",
   "meeting.noteTitleSystem": "システム音声",
 

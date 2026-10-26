@@ -18,6 +18,7 @@ const DEFAULTS = {
   model: '', // e.g. 'large-v3-turbo-q5_0'
   micDeviceId: 'default',
   meetingSource: 'both', // 'both' (system audio + mic) | 'system' (system audio only, no mic needed)
+  liveCaptionSec: 12, // live meeting captions: longest piece in seconds (shorter = faster, longer = more accurate)
   sounds: true,
   saveDictationNotes: true,
   saveAudio: false,

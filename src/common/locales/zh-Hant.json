@@ -80,6 +80,9 @@
   "meeting.noAudio": "沒有可用的音源：無法擷取系統聲音，也找不到麥克風。",
   "meeting.listening": "聆聽中… 有人說話時字幕會即時出現在這裡。",
   "meeting.liveError": "無法即時轉錄（是否已安裝模型？）— 錄音仍會繼續。",
+  "meeting.liveRate": "字幕更新",
+  "meeting.liveRateValue": "約每 {n} 秒",
+  "meeting.liveRateHint": "越短越即時，越長越準確。",
   "meeting.noteTitle": "會議",
   "meeting.noteTitleSystem": "系統聲音",
 

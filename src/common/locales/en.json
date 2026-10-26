@@ -80,6 +80,9 @@
   "meeting.noAudio": "No audio source is available: system audio could not be captured and no microphone was found.",
   "meeting.listening": "Listening… captions appear here as people speak.",
   "meeting.liveError": "Live captions unavailable (is a model installed?) — the recording continues.",
+  "meeting.liveRate": "Caption update",
+  "meeting.liveRateValue": "about every {n} s",
+  "meeting.liveRateHint": "Shorter = faster captions; longer = more accurate.",
   "meeting.noteTitle": "Meeting",
   "meeting.noteTitleSystem": "System audio",
 
