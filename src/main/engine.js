@@ -9,6 +9,7 @@ const { pipeline } = require('stream/promises');
 const { Readable } = require('stream');
 const { EventEmitter } = require('events');
 const config = require('./config');
+const { isHallucination } = require('./hallucinations');
 
 const WHISPER_CPP_VERSION = 'v1.8.6';
 const ENGINE_ZIPS = {
@@ -435,7 +436,7 @@ class Engine extends EventEmitter {
             if (lang === 'zh' || (lang === 'auto' && looksChinese(text))) {
               text = postprocessChinese(text, config.get().chineseVariant);
             }
-            onSegment({ t0, t1, text });
+            if (!isHallucination(text)) onSegment({ t0, t1, text });
           } else {
             scanProgress(line);
           }
@@ -461,7 +462,7 @@ class Engine extends EventEmitter {
             t0: s.offsets ? s.offsets.from : 0,
             t1: s.offsets ? s.offsets.to : 0,
             text: isZh ? postprocessChinese((s.text || '').trim(), variant) : (s.text || '').trim(),
-          }));
+          })).filter((s) => !isHallucination(s.text));
           resolve({
             text: segments.map((s) => s.text).join('\n').trim(),
             segments,

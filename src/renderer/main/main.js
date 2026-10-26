@@ -473,6 +473,19 @@ function rms(chunks, fromEnd = Infinity) {
   }
   return n ? Math.sqrt(sum / n) : 0;
 }
+// whisper invents text (video outros, subtitle credits) for long silence, so a recording
+// that ends quiet is cut 0.5 s after the last sound. The start stays, so times still match.
+function trimTrailingSilence(pcm) {
+  const win = 1600; // 100 ms
+  let end = pcm.length;
+  while (end > win) {
+    let sum = 0;
+    for (let i = end - win; i < end; i++) sum += pcm[i] * pcm[i];
+    if (Math.sqrt(sum / win) >= LIVE.silence) break;
+    end -= win;
+  }
+  return pcm.subarray(0, Math.min(pcm.length, end + 8000));
+}
 const fmtClock = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 function liveTick() {
@@ -609,10 +622,9 @@ async function stopMeeting(discard = false) {
   $('#meeting-idle').hidden = false;
   $('#meeting-live').hidden = true;
   $('#meet-timer').textContent = '0:00';
-  const total = meeting.chunks.reduce((a, c) => a + c.length, 0);
-  if (discard === true || total < 16000) { meeting.chunks = []; return; }
-  const pcm = concatPcm(meeting.chunks);
+  const pcm = trimTrailingSilence(concatPcm(meeting.chunks));
   meeting.chunks = [];
+  if (discard === true || pcm.length < 16000) return;
   const durationMs = Math.round((pcm.length / 16000) * 1000);
   const name = `${t(meeting.withMic ? 'meeting.noteTitle' : 'meeting.noteTitleSystem')} ${new Date().toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   await wp.startTranscription({ name, wav: encodeWav(pcm), durationMs, source: 'meeting', keepAudio: true });
