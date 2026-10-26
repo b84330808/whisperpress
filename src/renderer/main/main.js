@@ -452,7 +452,61 @@ function renderJobs() {
 }
 
 // ---------------- meeting ----------------
-const meeting = { active: false, ctx: null, streams: [], chunks: [], levels: [], startedAt: 0, raf: 0, timerInt: 0, withMic: false };
+const meeting = { active: false, ctx: null, streams: [], chunks: [], levels: [], startedAt: 0, raf: 0, timerInt: 0, withMic: false, live: null, liveInt: 0 };
+
+// Live captions: the stream is cut at natural pauses (or every LIVE.maxSec) and each piece
+// goes to the warm server. One request at a time — on a slow machine pieces just get longer.
+// The note itself still comes from the full-length pass after stopping.
+const LIVE = { minSec: 3, maxSec: 12, hardMaxSec: 28, pauseMs: 400, silence: 0.008 };
+
+function concatPcm(chunks) {
+  const pcm = new Float32Array(chunks.reduce((a, c) => a + c.length, 0));
+  let off = 0;
+  for (const c of chunks) { pcm.set(c, off); off += c.length; }
+  return pcm;
+}
+function rms(chunks, fromEnd = Infinity) {
+  let sum = 0, n = 0;
+  for (let i = chunks.length - 1; i >= 0 && n < fromEnd; i--) {
+    const c = chunks[i];
+    for (let j = c.length - 1; j >= 0 && n < fromEnd; j--, n++) sum += c[j] * c[j];
+  }
+  return n ? Math.sqrt(sum / n) : 0;
+}
+const fmtClock = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+function liveTick() {
+  const lv = meeting.live;
+  if (!meeting.active || !lv || lv.busy || lv.failed) return;
+  const sec = lv.len / 16000;
+  if (sec < LIVE.minSec) return;
+  const paused = rms(lv.buf, (LIVE.pauseMs / 1000) * 16000) < LIVE.silence;
+  if (!paused && sec < LIVE.maxSec) return;
+  let pcm = concatPcm(lv.buf);
+  if (pcm.length > LIVE.hardMaxSec * 16000) pcm = pcm.subarray(pcm.length - LIVE.hardMaxSec * 16000); // fell behind: keep the latest
+  const startMs = lv.posMs + Math.round(((lv.len - pcm.length) / 16000) * 1000);
+  lv.posMs += Math.round(sec * 1000);
+  lv.buf = []; lv.len = 0;
+  if (rms([pcm]) < LIVE.silence) return; // nothing said
+  lv.busy = true;
+  wp.transcribeLive(encodeWav(pcm)).then((text) => {
+    if (meeting.live !== lv || !text) return;
+    const box = $('#meet-transcript');
+    const stick = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
+    const line = document.createElement('div');
+    line.className = 'lt-line';
+    line.innerHTML = '<span class="lt-time"></span><span></span>';
+    line.firstChild.textContent = fmtClock(startMs);
+    line.lastChild.textContent = text;
+    box.appendChild(line);
+    if (stick) box.scrollTop = box.scrollHeight;
+  }).catch(() => {
+    if (meeting.live !== lv) return;
+    lv.failed = true; // e.g. no model yet: the recording itself continues
+    $('#meet-notice').textContent = [$('#meet-notice').textContent, t('meeting.liveError')].filter(Boolean).join(' ');
+    $('#meet-notice').hidden = false;
+  }).finally(() => { lv.busy = false; });
+}
 
 function renderMeetSource() {
   const src = settings.meetingSource === 'system' ? 'system' : 'both';
@@ -478,6 +532,7 @@ $('#btn-meet-start').addEventListener('click', async () => {
     node.port.onmessage = (e) => {
       if (!meeting.active) return;
       meeting.chunks.push(e.data);
+      if (meeting.live) { meeting.live.buf.push(e.data); meeting.live.len += e.data.length; }
       for (let i = 0; i < e.data.length; i++) acc.sum += e.data[i] * e.data[i];
       acc.n += e.data.length;
       const now = performance.now();
@@ -507,6 +562,10 @@ $('#btn-meet-start').addEventListener('click', async () => {
     $('#meet-notice').textContent = notice;
     $('#meet-notice').hidden = !notice;
     sys.getVideoTracks()[0]?.addEventListener('ended', stopMeeting); // user clicked "stop sharing"
+    meeting.live = { buf: [], len: 0, posMs: 0, busy: false, failed: false };
+    $('#meet-transcript').innerHTML = '';
+    $('#meet-transcript').dataset.empty = t('meeting.listening');
+    meeting.liveInt = setInterval(liveTick, 250);
     meeting.active = true;
     meeting.startedAt = Date.now();
     $('#meeting-idle').hidden = true;
@@ -540,6 +599,8 @@ async function stopMeeting(discard = false) {
   if (!meeting.active && !meeting.streams.length) return;
   meeting.active = false;
   clearInterval(meeting.timerInt);
+  clearInterval(meeting.liveInt);
+  meeting.live = null;
   cancelAnimationFrame(meeting.raf);
   await new Promise((r) => setTimeout(r, 150));
   for (const s of meeting.streams) for (const tr of s.getTracks()) tr.stop();
@@ -550,9 +611,7 @@ async function stopMeeting(discard = false) {
   $('#meet-timer').textContent = '0:00';
   const total = meeting.chunks.reduce((a, c) => a + c.length, 0);
   if (discard === true || total < 16000) { meeting.chunks = []; return; }
-  const pcm = new Float32Array(total);
-  let off = 0;
-  for (const c of meeting.chunks) { pcm.set(c, off); off += c.length; }
+  const pcm = concatPcm(meeting.chunks);
   meeting.chunks = [];
   const durationMs = Math.round((pcm.length / 16000) * 1000);
   const name = `${t(meeting.withMic ? 'meeting.noteTitle' : 'meeting.noteTitleSystem')} ${new Date().toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;

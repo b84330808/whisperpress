@@ -78,6 +78,8 @@
   "meeting.error": "Could not start the recording",
   "meeting.micFallback": "No microphone found — recording system audio only.",
   "meeting.noAudio": "No audio source is available: system audio could not be captured and no microphone was found.",
+  "meeting.listening": "Listening… captions appear here as people speak.",
+  "meeting.liveError": "Live captions unavailable (is a model installed?) — the recording continues.",
   "meeting.noteTitle": "Meeting",
   "meeting.noteTitleSystem": "System audio",
 

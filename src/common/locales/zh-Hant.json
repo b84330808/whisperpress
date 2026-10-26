@@ -78,6 +78,8 @@
   "meeting.error": "無法開始錄音",
   "meeting.micFallback": "找不到麥克風 — 只錄系統聲音。",
   "meeting.noAudio": "沒有可用的音源：無法擷取系統聲音，也找不到麥克風。",
+  "meeting.listening": "聆聽中… 有人說話時字幕會即時出現在這裡。",
+  "meeting.liveError": "無法即時轉錄（是否已安裝模型？）— 錄音仍會繼續。",
   "meeting.noteTitle": "會議",
   "meeting.noteTitleSystem": "系統聲音",
 

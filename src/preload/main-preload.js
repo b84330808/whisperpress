@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('wp', {
 
   startTranscription: (payload) => ipcRenderer.invoke('transcribe:start', payload),
   cancelTranscription: (id) => ipcRenderer.invoke('transcribe:cancel', id),
+  transcribeLive: (wav) => ipcRenderer.invoke('transcribe:live', wav),
 
   aiTest: () => ipcRenderer.invoke('ai:test'),
   aiSummarize: (noteId) => ipcRenderer.invoke('ai:summarize', noteId),

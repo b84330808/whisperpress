@@ -211,6 +211,8 @@ function bootstrap() {
     name, wavBuffer: Buffer.from(wav), durationMs, source, keepAudio, language,
   }));
   ipcMain.handle('transcribe:cancel', (e, id) => jobs.cancel(id));
+  // live captions while a meeting records: short clips on the warm server
+  ipcMain.handle('transcribe:live', async (e, wav) => dictation.cleanTranscript((await engine.transcribe(Buffer.from(wav))).text));
 
   // ---------------- IPC: AI ----------------
   ipcMain.handle('ai:test', async () => {
