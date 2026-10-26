@@ -46,7 +46,24 @@ https://github.com/user-attachments/assets/8db4657f-edae-42f2-b6db-351bb214fe22
 | ⏱ **タイムスタンプ付きエクスポート** | `.txt`、`.md`、`.srt` 字幕として出力。 |
 | 🔒 **設計レベルのプライバシー** | モデルは whisper.cpp 経由で CPU/GPU 上で動作。ノートはディスク上のただの JSON。 |
 | 🪶 **カスタム語彙** | 初期プロンプトで人名・専門用語・出力スタイルを誘導。 |
+| 🧑‍💻 **コーディングモード** | Windows Terminal・VS Code・Claude Code に音声入力：日本語／中国語／英語の混在、コード用語集（`use effect` → `useEffect`）、Enter を押すかどうかは選択可能。 |
 | 💻 **ハードウェア自動推奨** | CPU／RAM／NVIDIA GPU を検出し、最適なエンジンとモデルをワンクリックで適用。 |
+
+## コーディングモード
+
+ターミナル、エディタ、Claude Code のような AI コーディングエージェントに話しかけるためのモードです。*設定 → コーディングモード* かトレイメニューでオンにします：
+
+- **自動**：入力先のウィンドウがターミナルやコードエディタのときだけオン（Windows Terminal、PowerShell、cmd、VS Code、Cursor、Windsurf、JetBrains IDE、Android Studio、Visual Studio、Sublime Text、WezTerm、Alacritty…）。ほかのアプリはプロセス名で追加できます（例：`Claude`）。
+- **常にオン**、または **オフ**（既定）。
+
+オンのときの違い（録音ピルに `</> code` バッジが出ます）：
+
+- **言語の混在**：UI の言語で書かれ英語のコード用語を含む例文を Whisper に渡すので、「npm install してから git commit」や「幫我跑 pytest」の英語部分が英字のまま残ります。
+- **コード用語集**：よく言う用語（`pytest, kubectl, useEffect, …`）で Whisper のつづりを誘導し、文字起こし後に大文字小文字と空白も直します：`Pytest` → `pytest`、`use effect` → `useEffect`、`node js` → `Node.js`。`cube control => kubectl` のような行は、聞き取った語を意図した語に置き換えます。パス・URL・フラグ（`package.json`、`github.com/…`、`--use-effect`）は変更しません。
+- **文末の句点を外す**ので、`git status` が `git status。` になりません。
+- **Enter は選べます**：既定ではテキストを入力するだけで、確認してから自分で Enter を押します。「入力後に Enter を押す」をオンにすると、コマンドの実行やプロンプトの送信まで手を使わずに行えます。
+
+完全オフラインのままです：用語集はローカルモデルへのプロンプトにすぎません。管理者として実行中のターミナルは通常のアプリからの入力を受け付けません（Windows の制限）。必要なら WhisperPress も管理者として実行してください。
 
 ## ダウンロード
 

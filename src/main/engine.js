@@ -370,12 +370,16 @@ class Engine extends EventEmitter {
     fd.append('temperature_inc', '0.2');
     const lang = opts.language || cfg.language || 'auto';
     if (lang && lang !== 'auto') fd.append('language', lang);
+    // per-request prompt (coding mode); the server's --prompt stays the default
+    if (opts.prompt) fd.append('prompt', opts.prompt);
     const res = await fetch(`http://127.0.0.1:${this.port}/inference`, { method: 'POST', body: fd });
     if (!res.ok) throw new Error(`inference failed: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
     const j = await res.json();
     if (j.error) throw new Error(`inference failed: ${j.error}`);
     const language = j.language || lang;
-    const isZh = isChineseLang(language);
+    // Chinese mixed with English terms is often detected as "english"; the
+    // forced script must still apply, so also go by the text itself.
+    const isZh = isChineseLang(language) || (!/^(ja|japanese)/i.test(language) && looksChinese(j.text || ''));
     const variant = isZh ? config.get().chineseVariant : 'auto';
     const post = (s) => (isZh ? postprocessChinese(s, variant) : s);
     const segments = Array.isArray(j.segments)

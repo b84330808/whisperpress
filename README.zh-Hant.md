@@ -46,7 +46,24 @@ https://github.com/user-attachments/assets/8db4657f-edae-42f2-b6db-351bb214fe22
 | ⏱ **帶時間軸匯出** | 筆記可匯出 `.txt`、`.md` 或 `.srt` 字幕。 |
 | 🔒 **架構層級的隱私** | 模型透過 whisper.cpp 在你的 CPU/GPU 上執行；筆記是磁碟上的純 JSON。 |
 | 🪶 **自訂詞彙** | Initial prompt 提示人名、術語與輸出風格。 |
+| 🧑‍💻 **程式模式** | 對 Windows Terminal、VS Code、Claude Code 口述：中／日／英混講、程式詞彙（`use effect` → `useEffect`），要不要自動按 Enter 由你決定。 |
 | 💻 **硬體偵測建議** | 自動偵測 CPU／記憶體／NVIDIA GPU，一鍵套用最適合的引擎與模型。 |
+
+## 程式模式
+
+給「對終端機、編輯器或 Claude Code 這類 AI 程式助理說話」用的模式。在 *設定 → 程式模式* 或系統匣選單開啟：
+
+- **自動**：口述的目標視窗是終端機或程式編輯器時自動開啟（Windows Terminal、PowerShell、cmd、VS Code、Cursor、Windsurf、JetBrains IDE、Android Studio、Visual Studio、Sublime Text、WezTerm、Alacritty…）。其他 App 可用程序名稱加入，例如 `Claude`。
+- **一律開啟**，或 **關閉**（預設）。
+
+開啟時的差別（錄音膠囊會顯示 `</> code` 標記）：
+
+- **中／日／英混講**：給 Whisper 一句用你介面語言寫、夾帶英文程式術語的範例句，「幫我跑 pytest，然後 git commit」或「npm install してから」裡的英文會保持英文拼寫。
+- **程式詞彙**：列出你常說的詞（`pytest, kubectl, useEffect, …`），讓 Whisper 偏向這些拼法，轉錄後再修正大小寫與空格：`Pytest` → `pytest`、`use effect` → `useEffect`、`node js` → `Node.js`。像 `cube control => kubectl` 這樣的一行，會把聽到的換成你要的。路徑、網址、參數（`package.json`、`github.com/…`、`--use-effect`）不會被改。
+- **去掉句尾句號**，`git status` 不會變成 `git status。`。
+- **要不要按 Enter 由你決定**：預設只輸入文字，你確認後自己按 Enter；開啟「輸入後自動按 Enter」就能免手執行指令或送出提示。
+
+一樣完全離線：詞彙只是給本機模型的提示。以系統管理員身分執行的終端機，無法接收一般程式送來的輸入（Windows 的限制）；需要的話請把 WhisperPress 也用系統管理員身分執行。
 
 ## 下載安裝
 

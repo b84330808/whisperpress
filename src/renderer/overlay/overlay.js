@@ -9,6 +9,7 @@ const hintEl = document.getElementById('hint');
 const iconEl = document.getElementById('icon');
 const msgEl = document.getElementById('msg');
 const cancelBtn = document.getElementById('cancel');
+const codeEl = document.getElementById('code');
 
 let dict = {};
 wp.dict().then((d) => { dict = d.strings; });
@@ -112,8 +113,9 @@ function encodeWav(f32, sampleRate = 16000) {
 }
 
 // ---------------- UI ----------------
+let codingOn = false; // coding-mode chip, set per recording
 function setState(cls) {
-  pill.className = `visible ${cls}`;
+  pill.className = `visible ${cls}${codingOn ? ' coding' : ''}`;
 }
 function drawLoop() {
   const w = barsCanvas.width, h = barsCanvas.height;
@@ -144,6 +146,7 @@ wp.onCmd(async (payload) => {
     soundsOn = payload.sounds !== false;
     currentMode = payload.mode || 'hold';
     currentKey = payload.hotkeyLabel || 'F9';
+    codingOn = false;
     setState('state-recording');
     hintEl.textContent = currentMode === 'toggle'
       ? t('overlay.hintToggle', { key: currentKey })
@@ -167,6 +170,10 @@ wp.onCmd(async (payload) => {
   } else if (cmd === 'cancel') {
     if (recording) { await stopCapture(); }
     cancelAnimationFrame(rafId);
+  } else if (cmd === 'coding') {
+    codingOn = !!payload.on;
+    codeEl.textContent = `</> ${t('overlay.coding')}`;
+    pill.classList.toggle('coding', codingOn);
   } else if (cmd === 'phase') {
     if (payload.phase === 'locked') {
       pill.classList.add('locked');

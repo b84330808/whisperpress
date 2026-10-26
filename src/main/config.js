@@ -3,6 +3,7 @@ const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
+const { DEFAULT_VOCABULARY } = require('./coding');
 
 const DEFAULTS = {
   locale: 'auto', // 'auto' | 'en' | 'zh-Hant'
@@ -25,6 +26,10 @@ const DEFAULTS = {
   engineFlavor: 'cpu', // 'cpu' | 'cuda'
   storageDir: '', // where engine+models live; '' = userData
   initialPrompt: '', // custom vocabulary / spelling hints passed to whisper
+  codingMode: 'off', // 'off' | 'on' | 'auto' (auto = when a terminal/editor has focus)
+  codingVocabulary: DEFAULT_VOCABULARY, // code terms + "spoken => written" fixes
+  codingApps: '', // extra process names that count as coding apps for 'auto'
+  codingPressEnter: false, // press Enter after inserting (submits the command/prompt)
   ai: { enabled: false, baseUrl: 'http://localhost:11434/v1', apiKey: '', model: '' },
   onboarded: false,
 };

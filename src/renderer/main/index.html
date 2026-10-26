@@ -191,6 +191,30 @@
       </div>
 
       <div class="group">
+        <h2 data-i18n="settings.coding"></h2>
+        <div class="row">
+          <label><span data-i18n="settings.codingMode"></span> <span class="tip" data-i18n-tip="settings.codingModeTip">ⓘ</span></label>
+          <select id="set-codingMode">
+            <option value="off" data-i18n="settings.codingOff"></option>
+            <option value="auto" data-i18n="settings.codingAuto"></option>
+            <option value="on" data-i18n="settings.codingOn"></option>
+          </select>
+        </div>
+        <div class="row coding-only">
+          <label><span data-i18n="settings.codingPressEnter"></span> <span class="tip" data-i18n-tip="settings.codingPressEnterTip">ⓘ</span></label>
+          <input type="checkbox" id="set-codingPressEnter" class="switch" />
+        </div>
+        <div class="row col coding-only">
+          <label><span data-i18n="settings.codingVocab"></span> <span class="tip" data-i18n-tip="settings.codingVocabTip">ⓘ</span></label>
+          <textarea id="set-codingVocabulary" rows="5" class="mono" data-i18n-ph="settings.codingVocabPh"></textarea>
+        </div>
+        <div class="row coding-only" id="row-codingApps">
+          <label><span data-i18n="settings.codingApps"></span> <span class="tip" data-i18n-tip="settings.codingAppsTip">ⓘ</span></label>
+          <input type="text" id="set-codingApps" class="wide" data-i18n-ph="settings.codingAppsPh" />
+        </div>
+      </div>
+
+      <div class="group">
         <h2 data-i18n="settings.transcription"></h2>
         <div class="row">
           <label data-i18n="settings.language"></label>

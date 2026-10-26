@@ -553,7 +553,15 @@ function afterSettingsChange(key) {
   if (key === 'locale') reloadDict();
   if (key === 'hotkeyMode') $('#row-taplock').style.display = settings.hotkeyMode === 'hold' ? '' : 'none';
   if (key === 'language') updateChineseVariantRow();
+  if (key === 'codingMode') updateCodingRows();
   if (key === 'enabled' && currentNoteId) openNote(currentNoteId);
+}
+
+// coding-mode details are noise while it is off; extra apps only matter for Auto
+function updateCodingRows() {
+  const mode = settings.codingMode || 'off';
+  for (const row of document.querySelectorAll('.coding-only')) row.style.display = mode === 'off' ? 'none' : '';
+  $('#row-codingApps').style.display = mode === 'auto' ? '' : 'none';
 }
 
 // the Chinese-script option only matters when Chinese can be spoken (zh or auto-detect)
@@ -575,6 +583,11 @@ function fillSettingsForm() {
   $('#set-chineseVariant').value = settings.chineseVariant || 'auto';
   updateChineseVariantRow();
   $('#set-initialPrompt').value = settings.initialPrompt;
+  $('#set-codingMode').value = settings.codingMode || 'off';
+  $('#set-codingPressEnter').checked = !!settings.codingPressEnter;
+  $('#set-codingVocabulary').value = settings.codingVocabulary || '';
+  $('#set-codingApps').value = settings.codingApps || '';
+  updateCodingRows();
   $('#set-engineFlavor').value = settings.engineFlavor;
   $('#set-locale').value = settings.locale;
   $('#set-launchAtLogin').checked = settings.launchAtLogin;
@@ -607,6 +620,10 @@ bindSimple('#set-language', 'language');
 bindSimple('#set-chineseVariant', 'chineseVariant');
 bindSimple('#set-translate', 'translate');
 bindSimple('#set-initialPrompt', 'initialPrompt');
+bindSimple('#set-codingMode', 'codingMode');
+bindSimple('#set-codingPressEnter', 'codingPressEnter');
+bindSimple('#set-codingVocabulary', 'codingVocabulary');
+bindSimple('#set-codingApps', 'codingApps');
 bindSimple('#set-engineFlavor', 'engineFlavor');
 bindSimple('#set-locale', 'locale');
 bindSimple('#set-launchAtLogin', 'launchAtLogin');
@@ -874,7 +891,13 @@ async function startOnboarding() {
 // ---------------- dictation state in footer ----------------
 wp.on('dictation:state', () => { /* reserved for future status UI */ });
 wp.on('notes:changed', () => refreshNotesThrottled());
-wp.on('settings:changed', (s) => { settings = s; renderEngineStatus(); });
+wp.on('settings:changed', (s) => {
+  settings = s;
+  renderEngineStatus();
+  // coding mode can also be switched from the tray menu
+  $('#set-codingMode').value = settings.codingMode || 'off';
+  updateCodingRows();
+});
 wp.on('app:navigate', (view) => showView(view));
 
 // ---------------- boot ----------------

@@ -5,6 +5,8 @@ const engine = require('./engine');
 const injector = require('./injector');
 const notes = require('./notes');
 const windows = require('./windows');
+const coding = require('./coding');
+const i18n = require('./i18n');
 
 // Strip non-speech artifacts whisper emits for silence/noise: [BLANK_AUDIO], (music), ♪ …
 // and merge whisper's per-segment line breaks: dictation should come out as ONE line
@@ -30,6 +32,16 @@ class Dictation extends EventEmitter {
     this.state = 'idle'; // idle | recording | transcribing
     this.locked = false;
     this.startedAt = 0;
+    this.codingActive = Promise.resolve(false); // decided when recording starts
+  }
+
+  // Coding mode follows the window that had focus when the hotkey went down:
+  // that's where the text will be inserted (the overlay never takes focus).
+  _detectCoding(cfg) {
+    const mode = cfg.codingMode || 'off';
+    if (mode === 'off') return Promise.resolve(false);
+    if (mode === 'on') return Promise.resolve(true);
+    return injector.foregroundApp().then((app) => coding.shouldUseCodingMode(mode, app, cfg.codingApps));
   }
 
   _overlay(cmd, data) {
@@ -59,6 +71,8 @@ class Dictation extends EventEmitter {
       hotkeyLabel: (cfg.hotkey && cfg.hotkey.label) || 'F9',
     });
     this.emit('state', this.state);
+    this.codingActive = this._detectCoding(cfg).catch(() => false);
+    this.codingActive.then((on) => { if (on && this.state !== 'idle') this._overlay('coding', { on: true }); });
     // wake the model if it is not loaded yet so transcription is instant on stop
     if (es.server !== 'ready' && es.server !== 'starting') engine.start();
   }
@@ -91,16 +105,25 @@ class Dictation extends EventEmitter {
     if (durationMs < 350) { this._finish(); return; }
     const cfg = config.get();
     try {
-      const result = await engine.transcribe(wavBuffer);
+      const codingOn = await this.codingActive;
+      const prompt = codingOn
+        ? coding.buildCodingPrompt({ basePrompt: cfg.initialPrompt, locale: i18n.resolveLocale(), vocabulary: cfg.codingVocabulary })
+        : undefined;
+      const result = await engine.transcribe(wavBuffer, { prompt });
       if (this.state !== 'transcribing') return;
-      const text = cleanTranscript(result.text);
+      let text = cleanTranscript(result.text);
+      if (codingOn) text = coding.postprocessCoding(text, cfg.codingVocabulary);
       if (!text) {
         this._overlay('phase', { phase: 'empty' });
         setTimeout(() => this._finish(), 1400);
         return;
       }
       if (cfg.injectMode === 'paste' || cfg.injectMode === 'type') {
-        await injector.inject(text, { mode: cfg.injectMode, restoreClipboard: cfg.restoreClipboard });
+        await injector.inject(text, {
+          mode: cfg.injectMode,
+          restoreClipboard: cfg.restoreClipboard,
+          pressEnter: codingOn && !!cfg.codingPressEnter,
+        });
       } else {
         const { clipboard } = require('electron');
         clipboard.writeText(text); // 'off' still lands the text somewhere useful
