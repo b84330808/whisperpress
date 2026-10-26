@@ -452,12 +452,22 @@ function renderJobs() {
 }
 
 // ---------------- meeting ----------------
-const meeting = { active: false, ctx: null, streams: [], chunks: [], levels: [], startedAt: 0, raf: 0, timerInt: 0 };
+const meeting = { active: false, ctx: null, streams: [], chunks: [], levels: [], startedAt: 0, raf: 0, timerInt: 0, withMic: false };
+
+function renderMeetSource() {
+  const src = settings.meetingSource === 'system' ? 'system' : 'both';
+  $$('#meet-source button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.source === src)));
+}
+$$('#meet-source button').forEach((b) => b.addEventListener('click', async () => {
+  settings = await wp.setSettings({ meetingSource: b.dataset.source });
+  renderMeetSource();
+}));
 
 $('#btn-meet-start').addEventListener('click', async () => {
   try {
     const sys = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
     meeting.streams.push(sys);
+    const hasSystemAudio = sys.getAudioTracks().length > 0;
     const ctx = new AudioContext({ sampleRate: 16000 });
     meeting.ctx = ctx;
     await ctx.audioWorklet.addModule('../common/pcm-worklet.js');
@@ -477,13 +487,25 @@ $('#btn-meet-start').addEventListener('click', async () => {
         acc.sum = 0; acc.n = 0; acc.last = now;
       }
     };
-    if (sys.getAudioTracks().length) ctx.createMediaStreamSource(sys).connect(node);
-    if ($('#meet-mic').checked) {
-      const micCfg = settings.micDeviceId && settings.micDeviceId !== 'default' ? { deviceId: { exact: settings.micDeviceId } } : {};
-      const mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, ...micCfg } });
-      meeting.streams.push(mic);
-      ctx.createMediaStreamSource(mic).connect(node);
+    if (hasSystemAudio) ctx.createMediaStreamSource(sys).connect(node);
+    meeting.withMic = false;
+    let notice = '';
+    if (settings.meetingSource !== 'system') {
+      // a missing or unplugged mic must not cost the system audio: fall back to system-only
+      try {
+        const micCfg = settings.micDeviceId && settings.micDeviceId !== 'default' ? { deviceId: { exact: settings.micDeviceId } } : {};
+        const mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, ...micCfg } });
+        meeting.streams.push(mic);
+        ctx.createMediaStreamSource(mic).connect(node);
+        meeting.withMic = true;
+      } catch {
+        if (!hasSystemAudio) throw new Error(t('meeting.noAudio'));
+        notice = t('meeting.micFallback');
+      }
     }
+    if (!hasSystemAudio && !meeting.withMic) throw new Error(t('meeting.noAudio'));
+    $('#meet-notice').textContent = notice;
+    $('#meet-notice').hidden = !notice;
     sys.getVideoTracks()[0]?.addEventListener('ended', stopMeeting); // user clicked "stop sharing"
     meeting.active = true;
     meeting.startedAt = Date.now();
@@ -533,7 +555,7 @@ async function stopMeeting(discard = false) {
   for (const c of meeting.chunks) { pcm.set(c, off); off += c.length; }
   meeting.chunks = [];
   const durationMs = Math.round((pcm.length / 16000) * 1000);
-  const name = `${t('meeting.noteTitle')} ${new Date().toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+  const name = `${t(meeting.withMic ? 'meeting.noteTitle' : 'meeting.noteTitleSystem')} ${new Date().toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   await wp.startTranscription({ name, wav: encodeWav(pcm), durationMs, source: 'meeting', keepAudio: true });
 }
 $('#btn-meet-stop').addEventListener('click', () => stopMeeting());
@@ -583,6 +605,7 @@ function fillSettingsForm() {
   $('#set-chineseVariant').value = settings.chineseVariant || 'auto';
   updateChineseVariantRow();
   $('#set-initialPrompt').value = settings.initialPrompt;
+  renderMeetSource();
   $('#set-codingMode').value = settings.codingMode || 'off';
   $('#set-codingPressEnter').checked = !!settings.codingPressEnter;
   $('#set-codingVocabulary').value = settings.codingVocabulary || '';

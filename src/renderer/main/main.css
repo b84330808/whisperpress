@@ -156,6 +156,11 @@ input.switch:checked::after { left: 19px; background: #fff; }
 /* ---------- meeting ---------- */
 .meeting-card { margin-top: 18px; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 26px; display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
 .check-row { display: flex; gap: 8px; align-items: center; font-size: 13.5px; cursor: pointer; margin-bottom: 12px; }
+.seg { display: flex; width: fit-content; background: var(--bg3); border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 3px; margin-bottom: 12px; }
+.seg button { background: transparent; color: var(--muted); border: 0; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
+.seg button:hover { color: var(--text); }
+.seg button[aria-checked="true"] { background: var(--accent); color: #fff; }
+#meet-notice { margin-bottom: 12px; }
 .meet-live-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
 .rec-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--danger); animation: blink 1.1s ease-in-out infinite; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }

@@ -17,6 +17,7 @@ const DEFAULTS = {
   translate: false, // translate to English
   model: '', // e.g. 'large-v3-turbo-q5_0'
   micDeviceId: 'default',
+  meetingSource: 'both', // 'both' (system audio + mic) | 'system' (system audio only, no mic needed)
   sounds: true,
   saveDictationNotes: true,
   saveAudio: false,
