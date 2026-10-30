@@ -29,6 +29,9 @@ jobs:
         shell: bash
         run: for f in $(git ls-files 'src/*.js'); do node --check "$f" || exit 1; done
 
+      - name: Lint
+        run: npm run lint
+
       - name: Locale files have the same keys
         shell: bash
         run: |

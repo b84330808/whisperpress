@@ -1,7 +1,6 @@
 'use strict';
 const { app, ipcMain, dialog, shell, clipboard } = require('electron');
 const fs = require('fs');
-const path = require('path');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
