@@ -71,6 +71,19 @@ while ($true) {
 }
 `;
 
+// What paste mode puts back on the clipboard afterwards: plain and rich text and
+// images. Copied files (Explorer) can't be read back through Electron.
+function snapshotClipboard() {
+  const snap = { text: clipboard.readText() };
+  const html = clipboard.readHTML();
+  const rtf = clipboard.readRTF();
+  const image = clipboard.readImage();
+  if (html) snap.html = html;
+  if (rtf) snap.rtf = rtf;
+  if (!image.isEmpty()) snap.image = image;
+  return snap;
+}
+
 class Injector {
   constructor() {
     this.proc = null;
@@ -126,13 +139,13 @@ class Injector {
       if (pressEnter) await this._enterAfter(60);
       return;
     }
-    const prev = restoreClipboard ? clipboard.readText() : null;
+    const prev = restoreClipboard ? snapshotClipboard() : null;
     clipboard.writeText(text);
     await new Promise((r) => setTimeout(r, 80)); // let the clipboard settle
     await this._send('PASTE', 8000);
     if (restoreClipboard) {
       await new Promise((r) => setTimeout(r, 350)); // target app must read the clipboard first
-      clipboard.writeText(prev || '');
+      clipboard.write(prev);
     }
     // terminals process a paste asynchronously; an Enter sent right after
     // Ctrl+V can arrive before the pasted text

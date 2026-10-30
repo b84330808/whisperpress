@@ -19,10 +19,19 @@ function stub(id, exports) {
   require.cache[file] = m;
 }
 
-let clipboardText = '';
+// one copy in several formats at once; writing replaces all of them, like Windows'
+let board = {};
+const noImage = { isEmpty: () => true };
 stub('electron', {
   app: { getPath: () => userData, getLocale: () => 'en', getAppPath: () => process.cwd() },
-  clipboard: { readText: () => clipboardText, writeText: (s) => { clipboardText = s; } },
+  clipboard: {
+    readText: () => board.text || '',
+    readHTML: () => board.html || '',
+    readRTF: () => board.rtf || '',
+    readImage: () => board.image || noImage,
+    writeText: (text) => { board = { text }; },
+    write: (data) => { board = { ...data }; },
+  },
 });
 
 // uiohook keycodes the hotkey code looks up by name (F9 is the default hotkey)
