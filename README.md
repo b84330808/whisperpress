@@ -6,7 +6,14 @@
 
 <p align="center">
   <b>Hold a key. Speak. Your words appear — in any app.</b><br/>
-  Fully offline voice typing &amp; voice notes for Windows, powered by <a href="https://github.com/ggml-org/whisper.cpp">whisper.cpp</a>.
+  Free, fully offline push-to-talk voice typing &amp; voice notes for Windows, powered by <a href="https://github.com/ggml-org/whisper.cpp">whisper.cpp</a>.
+</p>
+
+<p align="center">
+  <a href="https://github.com/b84330808/whisperpress/releases/latest"><img src="https://img.shields.io/github/v/release/b84330808/whisperpress" alt="Latest release" /></a>
+  <a href="https://github.com/b84330808/whisperpress/actions/workflows/ci.yml"><img src="https://github.com/b84330808/whisperpress/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6" alt="Windows 10 | 11" />
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/b84330808/whisperpress" alt="MIT license" /></a>
 </p>
 
 <p align="center">
@@ -21,7 +28,34 @@
 
 https://github.com/user-attachments/assets/8db4657f-edae-42f2-b6db-351bb214fe22
 
+<!--
+  Screenshots to add (none exist yet; the GIF above only shows dictation into Notepad).
+  Capture at 100% display scaling, about 1100 px wide:
+  1. assets/screenshot-coding.png: Windows Terminal running Claude Code, the recording pill
+     showing the "</> code" badge, and a mixed-language prompt such as
+     "幫我跑 pytest，然後 git commit" already typed at the prompt.
+  2. assets/screenshot-meeting.png: the Meeting view during a recording, with live captions
+     scrolling in the transcript box.
+  3. assets/screenshot-notes.png: the Notes view with a few dictations, one note open, and
+     its AI summary shown (only if AI is set up; otherwise leave the summary out).
+  Then replace this comment with:
+  <p align="center">
+    <img src="assets/screenshot-coding.png" width="32%" alt="Coding mode in Windows Terminal" />
+    <img src="assets/screenshot-meeting.png" width="32%" alt="Live captions while recording a meeting" />
+    <img src="assets/screenshot-notes.png" width="32%" alt="Notes history" />
+  </p>
+-->
+
 ---
+
+## Quick start
+
+1. Download **`WhisperPress-Setup-x.x.x.exe`** from the [latest release](https://github.com/b84330808/whisperpress/releases/latest) and run it.
+   Windows SmartScreen may warn because the installer isn't code-signed: click **More info → Run anyway**.
+2. On first launch, WhisperPress downloads the whisper.cpp engine (~16 MB) and lets you pick a model. The recommended **large-v3-turbo-q5_0** is a 574 MB download. This is the only step that needs the internet.
+3. Click into any text box, **hold F9, speak, and release**. The text is typed at your cursor and saved as a note.
+
+Tap F9 instead of holding it to record hands-free, then press it again to finish. `Esc` cancels. The hotkey can be changed in *Settings → Dictation*.
 
 ## Why WhisperPress?
 
@@ -36,11 +70,11 @@ Press and hold a hotkey (default **F9**), talk, release — your speech is trans
 | | |
 |---|---|
 | 🎙 **Push-to-talk dictation** | Hold to talk, or quick-tap to lock recording. Toggle mode available. |
-| ⌨️ **Types into any app** | Pastes at the cursor (clipboard is restored), or types character-by-character. |
+| ⌨️ **Types into any app** | Pastes at the cursor (your clipboard, including images and formatted text, is restored), or types character-by-character. |
 | 📝 **Notes history** | Every dictation/transcription saved locally as a note. Search, edit, copy. |
 | 📂 **Audio file import** | MP3, M4A, WAV, OGG, FLAC… with live streaming output while transcribing. |
-| 🖥 **Meeting recording** | Captures system audio (Teams / Meet / Zoom) + your mic, transcribes locally. |
-| 🌍 **100+ languages** | Whisper multilingual models, auto-detect or fixed language, optional translate-to-English. |
+| 🖥 **Meeting recording** | Records system audio (Teams / Meet / Zoom, videos…) with or without your mic, shows live captions while recording, then transcribes the whole recording locally. |
+| 🌍 **99 languages** | Whisper multilingual models, auto-detect or fixed language, optional translate-to-English. |
 | 🈶 **Traditional/Simplified Chinese** | Deterministic OpenCC conversion of Chinese output — no model roulette. |
 | ✦ **AI summaries & Q&A** | Optional. Point it at any OpenAI-compatible endpoint — e.g. local [Ollama](https://ollama.com) to stay offline. |
 | ⏱ **Timestamped export** | Export notes as `.txt`, `.md`, or `.srt` subtitles. |
@@ -65,6 +99,14 @@ What changes while it's on (the overlay shows a `</> code` badge):
 
 Still fully offline: the vocabulary is only a prompt for the local model. Terminals running as administrator can't receive input from a normal app (a Windows rule); run WhisperPress as admin too if you need that.
 
+## Requirements
+
+- **Windows 10 or 11, 64-bit (x64).** macOS and Linux are not supported (see the [FAQ](#faq)).
+- **Memory and disk** depend on the model: from ~0.4 GB of RAM and 78 MB of disk for `tiny` to ~1.5 GB and 574 MB for the recommended model (table below), plus the 16 MB engine.
+- **A microphone** for dictation. Meeting recording also works with system audio only.
+- **Optional:** an NVIDIA GPU for the CUDA engine (a ~440 MB download instead of 16 MB). Other GPUs are not used; the CPU engine runs everywhere.
+- **Internet** only for the first download of the engine (GitHub) and models (Hugging Face), and for the optional AI features if you point them at a server outside your PC.
+
 ## Download
 
 Grab the latest build from the **[Releases page](https://github.com/b84330808/whisperpress/releases/latest)**:
@@ -73,8 +115,6 @@ Grab the latest build from the **[Releases page](https://github.com/b84330808/wh
 - `WhisperPress-Portable-x.x.x.exe` — portable, just download and run
 
 > Windows SmartScreen may warn on first run (the binaries are not code-signed). Click **More info → Run anyway**. All source code is public here — review it or build it yourself.
-
-## Getting started
 
 ### Run from source
 
@@ -97,22 +137,62 @@ npm run dist     # NSIS installer + portable exe in release/
 
 ## Models
 
-Downloaded on demand from [Hugging Face (ggerganov/whisper.cpp)](https://huggingface.co/ggerganov/whisper.cpp):
+Downloaded on demand from [Hugging Face (ggerganov/whisper.cpp)](https://huggingface.co/ggerganov/whisper.cpp). RAM figures are the app's own rough estimates.
 
-| Model | Size | Best for |
-|---|---|---|
-| tiny / base | 78–148 MB | quick drafts, fast CPUs not required |
-| small | 488 MB | good general balance |
-| **large-v3-turbo (q5_0)** | **574 MB** | **recommended — best speed/accuracy** |
-| medium q5_0 / large-v3 q5_0 | 539 MB – 1.1 GB | maximum accuracy |
+| Model | Download | RAM | Best for |
+|---|---|---|---|
+| tiny | 78 MB | ~0.4 GB | quick drafts on any PC |
+| base | 148 MB | ~0.5 GB | fast, older PCs |
+| small | 488 MB | ~1.0 GB | good general balance |
+| medium-q5_0 | 539 MB | ~1.2 GB | higher accuracy |
+| **large-v3-turbo-q5_0** | **574 MB** | **~1.5 GB** | **recommended — best speed/accuracy** |
+| large-v3-turbo | 1.6 GB | ~2.5 GB | turbo without quantization |
+| large-v3-q5_0 | 1.1 GB | ~2.5 GB | maximum accuracy, slowest |
 
-NVIDIA GPU? Switch *Settings → Compute* to **CUDA** for a much faster engine build.
+Not sure? *Settings → Models & engine → Hardware recommendation* picks an engine and model for your PC and applies them in one click. NVIDIA GPU? Switch *Settings → Models & engine → Compute* to **CUDA** for a much faster engine build.
 
 ## Tips
 
 - **Traditional Chinese output**: pick *Settings → Transcription → Chinese output script → Force Traditional* for a guaranteed script (OpenCC); a vocabulary hint like `以下是繁體中文的逐字稿：` further improves word choice.
 - **Tap to lock**: quick-tap the hotkey to keep recording hands-free; press it again to finish. `Esc` cancels.
 - **AI features**: install [Ollama](https://ollama.com), `ollama pull qwen3:4b`, then enable AI in Settings with the default base URL `http://localhost:11434/v1`.
+
+## Limitations
+
+- **Windows only**, x64.
+- **Text appears after you release the key**, not while you speak. Longer dictations take longer to transcribe; how long depends on your CPU/GPU and the model.
+- **Apps running as administrator** can't receive typed or pasted text from a normal app (a Windows rule). Run WhisperPress as administrator if you need to dictate into them.
+- **Paste mode borrows the clipboard** for a moment. Text, formatted text and images you had copied are put back; copied files are not. Use *Insert text by → Typing each character* to leave the clipboard alone.
+- **Meeting recording captures everything your PC plays**, not a single app. It records through Windows' screen-sharing audio; the screen image is discarded.
+- **Whisper can mishear**, and over silence or music it sometimes invents text (video outros, subtitle credits). WhisperPress drops the common invented lines but can't catch everything.
+- **No auto-update.** New versions are published on the [Releases page](https://github.com/b84330808/whisperpress/releases); *Watch → Custom → Releases* on GitHub notifies you.
+- **The installers are not code-signed**, so SmartScreen warns on first run.
+
+## FAQ
+
+**Is it really offline?**
+After the one-time download of the engine and model, yes: recording, transcription and notes all stay on your PC, and dictation works with the network unplugged. The only other network use is the optional AI feature, which talks to the endpoint *you* configure (Ollama or LM Studio keep that on your PC too).
+
+**Which model should I choose?**
+Start with `large-v3-turbo-q5_0`. If transcription feels slow on an older PC, try `small` or `base`. The hardware recommendation in *Settings → Models & engine* suggests one for your machine.
+
+**Can I change the hotkey?**
+Yes, in *Settings → Dictation*. Any key or combination works, including a modifier on its own such as Right Ctrl. You can also switch from hold-to-talk to press-to-start / press-to-stop.
+
+**The text doesn't show up in some app. What can I do?**
+If the app runs as administrator, run WhisperPress as administrator too. If the app blocks pasting, set *Insert text by* to *Typing each character*. With *Clipboard only*, the text is left on the clipboard for you to paste yourself. Every dictation is also saved in *Notes*, so nothing is lost.
+
+**Does it handle Chinese, Japanese, or mixed languages?**
+Yes. The multilingual Whisper models cover 99 languages, auto-detected or fixed in *Settings → Transcription*. For Chinese, *Chinese output script* forces Traditional or Simplified characters. Coding mode keeps English terms in Latin script inside Chinese or Japanese speech.
+
+**Does it run on macOS or Linux?**
+No. Typing into other apps (Win32 `SendInput`), unpacking the engine and capturing system audio are Windows-specific today.
+
+**Where is my data, and how do I remove it?**
+Notes, settings and (by default) the engine and models live in `%APPDATA%\WhisperPress`. *Settings → Models & engine* can move the engine and models to another folder. Uninstalling keeps that folder, so updating never loses your notes; delete it yourself to remove everything.
+
+**Is it free?**
+Yes. MIT-licensed, no account, no paid tier.
 
 ## How it works
 
@@ -127,6 +207,15 @@ NVIDIA GPU? Switch *Settings → Compute* to **CUDA** for a much faster engine b
 
 Your audio is processed in-memory and (optionally) stored **only** on your disk. The app talks to the network exclusively to download engine/model files at setup, and — only if you enable AI features — to the endpoint *you* configure.
 
+## Development
+
+```powershell
+npm test         # unit tests (plain Node, no Electron or whisper needed)
+npm run lint     # ESLint
+```
+
+CI runs both, plus a syntax check of every script, on pull requests and pushes to `main`. Issues and pull requests are welcome.
+
 ## Roadmap
 
 - [ ] SenseVoice / Parakeet engines (sherpa-onnx) for even faster CJK transcription
@@ -138,3 +227,5 @@ Your audio is processed in-memory and (optionally) stored **only** on your disk.
 ## License
 
 [MIT](LICENSE)
+
+If WhisperPress saves you some typing, a ⭐ helps other people find it.
