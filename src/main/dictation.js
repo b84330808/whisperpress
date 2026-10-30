@@ -11,11 +11,16 @@ const i18n = require('./i18n');
 // Strip non-speech artifacts whisper emits for silence/noise: [BLANK_AUDIO], (music), ♪ …
 // and merge whisper's per-segment line breaks: dictation should come out as ONE line
 // (a stray Enter in type mode would even submit chat messages). CJK joins directly,
-// Latin gets a space between segments.
+// Latin gets a space between segments. Brackets right after a word are code, not
+// an annotation: foo(bar), list[0].
 function cleanTranscript(text) {
+  const isNoise = (inner) => !inner.trim() || /[a-zA-Z_ ]+|音樂|雜音|掌聲/.test(inner);
   const lines = text
     .split('\n')
-    .map((l) => l.replace(/[\[(][^\])]{0,40}[\])]/g, (m) => (/[a-zA-Z_ ]+|音樂|雜音|掌聲/.test(m.slice(1, -1)) && m.length < 30 ? '' : m)).trim())
+    .map((l) => l
+      .replace(/[♪♫♬]/g, '')
+      .replace(/(?<![A-Za-z0-9_])[[(][^\])]{0,40}[\])]/g, (m) => (isNoise(m.slice(1, -1)) && m.length < 30 ? '' : m))
+      .trim())
     .filter(Boolean);
   const CJK = /[　-鿿＀-￯]/;
   let out = '';
@@ -48,8 +53,21 @@ class Dictation extends EventEmitter {
     windows.sendOverlay({ cmd, ...data });
   }
 
+  // Push-to-talk: the hotkeys drive dictation, and their state follows it back.
+  // A press dictation ignored (still transcribing, no model) or a recording that
+  // ended without the key (mic error) must not leave them waiting for a "stop"
+  // press, or the next press would be swallowed.
+  attachHotkeys(hotkeys) {
+    hotkeys.on('start', () => { if (!this.start()) hotkeys.externalStop(); });
+    hotkeys.on('stop', () => this.stop());
+    hotkeys.on('cancel', () => this.cancel());
+    hotkeys.on('lock', () => this.lock());
+    this.on('state', (s) => { if (s === 'idle') hotkeys.externalStop(); });
+  }
+
+  // true if recording started
   start() {
-    if (this.state !== 'idle') return;
+    if (this.state !== 'idle') return false;
     const cfg = config.get();
     const es = engine.getState();
     if (!es.engineInstalled || !es.models.some((m) => m.installed && m.id === cfg.model)) {
@@ -57,7 +75,7 @@ class Dictation extends EventEmitter {
       this._overlay('phase', { phase: 'error', msgKey: 'overlay.noModel' });
       setTimeout(() => { if (this.state === 'idle') windows.hideOverlay(); }, 2600);
       windows.showMain('onboarding');
-      return;
+      return false;
     }
     this.state = 'recording';
     this.locked = false;
@@ -75,6 +93,7 @@ class Dictation extends EventEmitter {
     this.codingActive.then((on) => { if (on && this.state !== 'idle') this._overlay('coding', { on: true }); });
     // wake the model if it is not loaded yet so transcription is instant on stop
     if (es.server !== 'ready' && es.server !== 'starting') engine.start();
+    return true;
   }
 
   lock() {
@@ -166,8 +185,7 @@ class Dictation extends EventEmitter {
 
   toggle() {
     if (this.state === 'idle') {
-      require('./hotkeys').externalStart();
-      this.start();
+      if (this.start()) require('./hotkeys').externalStart();
     } else if (this.state === 'recording') {
       require('./hotkeys').externalStop();
       this.stop();
