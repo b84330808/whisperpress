@@ -24,6 +24,7 @@ let stream = null;
 let ctx = null;
 let chunks = [];
 let recording = false;
+let capturing = null; // startCapture() still opening the mic
 let startedAt = 0;
 let levels = new Array(24).fill(0);
 let rafId = 0;
@@ -155,19 +156,25 @@ wp.onCmd(async (payload) => {
     cancelAnimationFrame(rafId);
     drawLoop();
     beep(880, 90);
+    capturing = startCapture(payload.deviceId);
     try {
-      await startCapture(payload.deviceId);
+      await capturing;
     } catch (err) {
       wp.sendError(String(err.message || err));
       recording = false;
     }
   } else if (cmd === 'stop') {
+    // opening the mic can take longer than a short press (e.g. Bluetooth headsets);
+    // a stop that arrives meanwhile must wait for it, or it is lost and the pill
+    // stays on "transcribing" while the mic keeps recording
+    if (capturing) await capturing.catch(() => {});
     if (!recording) return;
     beep(620, 90);
     const pcm = await stopCapture();
     const durationMs = Math.round((pcm.length / 16000) * 1000);
     wp.sendAudio(encodeWav(pcm), durationMs);
   } else if (cmd === 'cancel') {
+    if (capturing) await capturing.catch(() => {});
     if (recording) { await stopCapture(); }
     cancelAnimationFrame(rafId);
   } else if (cmd === 'coding') {

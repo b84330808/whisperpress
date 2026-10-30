@@ -99,7 +99,7 @@
   "settings.injectType": "逐字打字（給會擋貼上的應用程式）",
   "settings.injectOff": "只複製到剪貼簿（不自動輸入）",
   "settings.restoreClipboard": "貼上後還原剪貼簿",
-  "settings.restoreClipboardTip": "貼上模式會暫時用辨識文字蓋掉剪貼簿。開啟後，貼上完成約 0.35 秒會自動把你原本複製的內容放回去，不會弄丟。\n限制：只還原文字，圖片或檔案不會被還原。\n關閉的話，辨識文字會留在剪貼簿裡，方便之後到處貼。",
+  "settings.restoreClipboardTip": "貼上模式會暫時用辨識文字蓋掉剪貼簿。開啟後，貼上完成約 0.35 秒會自動把你原本複製的內容放回去，不會弄丟。\n文字、格式化文字與圖片都會還原；複製的檔案則不會。\n關閉的話，辨識文字會留在剪貼簿裡，方便之後到處貼。",
   "settings.mic": "麥克風",
   "settings.micDefault": "系統預設",
   "settings.sounds": "開始/結束提示音",

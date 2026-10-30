@@ -10,6 +10,7 @@ const { Readable } = require('stream');
 const { EventEmitter } = require('events');
 const config = require('./config');
 const { isHallucination } = require('./hallucinations');
+const { looksChinese, isChineseText, postprocessChinese } = require('./chinese');
 
 const WHISPER_CPP_VERSION = 'v1.8.6';
 const ENGINE_ZIPS = {
@@ -29,40 +30,21 @@ const MODELS = [
   { id: 'large-v3-q5_0', sizeMB: 1080, ram: '~2.5 GB', tier: 'max-quality' },
 ];
 
-// Deterministic Traditional/Simplified conversion (the initial prompt only *biases*
-// the script whisper picks; OpenCC guarantees it).
-const occConverters = {};
-function convertChinese(text, variant) {
-  if (!text || variant === 'auto') return text;
-  try {
-    if (!occConverters[variant]) {
-      const OpenCC = require('opencc-js');
-      occConverters[variant] = variant === 'traditional'
-        ? OpenCC.Converter({ from: 'cn', to: 'twp' })
-        : OpenCC.Converter({ from: 'twp', to: 'cn' });
-    }
-    return occConverters[variant](text);
-  } catch (e) {
-    console.error('opencc failed', e.message);
-    return text;
-  }
-}
-function isChineseLang(lang) { return /^(zh|chinese)/i.test(lang || ''); }
-// for streamed segments before the detected language is known: hanzi but no kana
-function looksChinese(text) { return /[一-鿿]/.test(text) && !/[぀-ヿ]/.test(text); }
-
-// whisper emits ASCII punctuation in Chinese text; switch to full-width, but only
-// after a CJK character so Latin fragments (names, code) keep theirs
-function normalizeChinesePunct(text) {
-  return text
-    .replace(/([一-鿿])\s*,\s*/g, '$1，')
-    .replace(/([一-鿿])\s*\?/g, '$1？')
-    .replace(/([一-鿿])\s*!/g, '$1！')
-    .replace(/([一-鿿])\s*;/g, '$1；')
-    .replace(/([一-鿿])\s*\.(?=$|\s|[一-鿿])/g, '$1。');
-}
-function postprocessChinese(text, variant) {
-  return normalizeChinesePunct(convertChinese(text, variant));
+// whisper-cli's JSON output (-oj) -> {text, segments, language}. The forced
+// Chinese script applies like it does for dictation: also when mixed
+// Chinese/English speech was detected as English.
+function parseCliOutput(j, requestedLang, chineseVariant) {
+  const language = (j.result && j.result.language) || requestedLang;
+  const raw = (j.transcription || []).map((s) => ({
+    t0: s.offsets ? s.offsets.from : 0,
+    t1: s.offsets ? s.offsets.to : 0,
+    text: (s.text || '').trim(),
+  }));
+  const isZh = isChineseText(language, raw.map((s) => s.text).join(''));
+  const segments = raw
+    .map((s) => (isZh ? { ...s, text: postprocessChinese(s.text, chineseVariant) } : s))
+    .filter((s) => !isHallucination(s.text));
+  return { text: segments.map((s) => s.text).join('\n').trim(), segments, language };
 }
 
 class Engine extends EventEmitter {
@@ -74,6 +56,7 @@ class Engine extends EventEmitter {
     this.stateDetail = '';
     this.downloads = new Map(); // key -> AbortController
     this.startSeq = 0;
+    this.starting = null; // promise of the latest start()
     this.busy = false;
   }
 
@@ -292,7 +275,26 @@ class Engine extends EventEmitter {
     });
   }
 
-  async start() {
+  start() {
+    this.starting = this._start();
+    return this.starting;
+  }
+
+  // Resolves true once the server is ready. A server that is still loading its
+  // model is waited for, not restarted: a restart throws the load away, and the
+  // caller already waiting on it would fail with engine-not-ready.
+  async ensureReady() {
+    if (this.state === 'ready') return true;
+    let p = this.state === 'starting' ? this.starting : this.start();
+    for (;;) {
+      const ok = await p;
+      // a newer start() (e.g. a setting changed mid-load) replaced this one: follow it
+      if (ok || p === this.starting) return ok;
+      p = this.starting;
+    }
+  }
+
+  async _start() {
     const seq = ++this.startSeq;
     this.stop();
     const cfg = config.get();
@@ -360,7 +362,7 @@ class Engine extends EventEmitter {
   // ---------- transcription (short clips, warm server) ----------
   async transcribe(wavBuffer, opts = {}) {
     if (this.state !== 'ready') {
-      const ok = await this.start();
+      const ok = await this.ensureReady();
       if (!ok) throw new Error('engine-not-ready');
     }
     const cfg = config.get();
@@ -378,9 +380,7 @@ class Engine extends EventEmitter {
     const j = await res.json();
     if (j.error) throw new Error(`inference failed: ${j.error}`);
     const language = j.language || lang;
-    // Chinese mixed with English terms is often detected as "english"; the
-    // forced script must still apply, so also go by the text itself.
-    const isZh = isChineseLang(language) || (!/^(ja|japanese)/i.test(language) && looksChinese(j.text || ''));
+    const isZh = isChineseText(language, j.text);
     const variant = isZh ? config.get().chineseVariant : 'auto';
     const post = (s) => (isZh ? postprocessChinese(s, variant) : s);
     const segments = Array.isArray(j.segments)
@@ -455,19 +455,7 @@ class Engine extends EventEmitter {
         try {
           const j = JSON.parse(fs.readFileSync(`${outBase}.json`, 'utf8'));
           try { fs.unlinkSync(`${outBase}.json`); } catch { /* ignore */ }
-          const language = (j.result && j.result.language) || lang;
-          const isZh = isChineseLang(language);
-          const variant = isZh ? config.get().chineseVariant : 'auto';
-          const segments = (j.transcription || []).map((s) => ({
-            t0: s.offsets ? s.offsets.from : 0,
-            t1: s.offsets ? s.offsets.to : 0,
-            text: isZh ? postprocessChinese((s.text || '').trim(), variant) : (s.text || '').trim(),
-          })).filter((s) => !isHallucination(s.text));
-          resolve({
-            text: segments.map((s) => s.text).join('\n').trim(),
-            segments,
-            language,
-          });
+          resolve(parseCliOutput(j, lang, config.get().chineseVariant));
         } catch (e) { reject(e); }
       });
     });
@@ -479,3 +467,4 @@ class Engine extends EventEmitter {
 
 module.exports = new Engine();
 module.exports.MODELS = MODELS;
+module.exports.parseCliOutput = parseCliOutput;

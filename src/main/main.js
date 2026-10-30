@@ -1,7 +1,6 @@
 'use strict';
 const { app, ipcMain, dialog, shell, clipboard } = require('electron');
 const fs = require('fs');
-const path = require('path');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -37,10 +36,7 @@ function bootstrap() {
 
     const hotkeysOk = hotkeys.start();
     if (!hotkeysOk) console.error('global hotkeys unavailable');
-    hotkeys.on('start', () => dictation.start());
-    hotkeys.on('stop', () => dictation.stop());
-    hotkeys.on('cancel', () => dictation.cancel());
-    hotkeys.on('lock', () => dictation.lock());
+    dictation.attachHotkeys(hotkeys);
 
     dictation.on('state', (s) => {
       tray.setRecording(s === 'recording');
