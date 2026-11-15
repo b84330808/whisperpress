@@ -7,5 +7,8 @@ contextBridge.exposeInMainWorld('wp', {
   sendError: (message) => ipcRenderer.send('overlay:error', message),
   stopClick: () => ipcRenderer.send('overlay:stopClick'),
   cancelClick: () => ipcRenderer.send('overlay:cancelClick'),
+  dragStart: () => ipcRenderer.send('overlay:dragStart'),
+  dragEnd: () => ipcRenderer.send('overlay:dragEnd'),
+  previewClose: () => ipcRenderer.send('overlay:previewClose'),
   dict: () => ipcRenderer.invoke('i18n:dict'),
 });

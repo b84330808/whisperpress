@@ -21,6 +21,7 @@ function bootstrap() {
   const jobs = require('./jobs');
   const { isHallucination } = require('./hallucinations');
   const ai = require('./ai');
+  const power = require('./power');
 
   app.isQuitting = false;
   const aiChats = new Map(); // reqId -> AbortController
@@ -42,6 +43,8 @@ function bootstrap() {
       tray.setRecording(s === 'recording');
       windows.broadcast('dictation:state', s);
     });
+    windows.onOverlayGone(() => dictation.overlayLost());
+    power.init({ hotkeys, dictation, windows, engine });
 
     engine.on('status', (st) => windows.broadcast('engine:status', st));
     engine.on('progress', (p) => windows.broadcast('engine:progress', p));
@@ -81,6 +84,7 @@ function bootstrap() {
       if ('locale' in patch && windows.overlay) {
         windows.overlay.webContents.send('overlay:cmd', { cmd: 'localeChanged' });
       }
+      if ('overlayPosition' in patch || 'overlayCustom' in patch) windows.repositionOverlay();
       const engineKeys = ['language', 'translate', 'initialPrompt', 'threads', 'model', 'engineFlavor'];
       if (engineKeys.some((k) => k in patch) && data.model) engine.start();
       windows.broadcast('settings:changed', data);
@@ -202,6 +206,10 @@ function bootstrap() {
   ipcMain.on('overlay:error', (e, message) => dictation.onRecorderError(message));
   ipcMain.on('overlay:stopClick', () => { hotkeys.externalStop(); dictation.stop(); });
   ipcMain.on('overlay:cancelClick', () => { hotkeys.externalStop(); dictation.cancel(); });
+  ipcMain.on('overlay:dragStart', () => windows.startDrag());
+  ipcMain.on('overlay:dragEnd', () => { windows.endDrag(true); dictation.previewActivity(); });
+  ipcMain.on('overlay:previewClose', () => dictation.endPreview());
+  ipcMain.handle('overlay:preview', () => dictation.preview());
 
   // ---------------- IPC: file/meeting transcription ----------------
   ipcMain.handle('transcribe:start', (e, { name, wav, durationMs, source, keepAudio, language }) => jobs.submit({

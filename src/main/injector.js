@@ -98,8 +98,10 @@ class Injector {
     this.proc = spawn('powershell.exe', [
       '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script,
     ], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = this.proc;
     let buf = '';
-    this.proc.stdout.on('data', (d) => {
+    proc.stdout.on('data', (d) => {
+      if (this.proc !== proc) return; // replies from a helper that was replaced
       buf += d.toString('utf8');
       let i;
       while ((i = buf.indexOf('\n')) >= 0) {
@@ -109,7 +111,8 @@ class Injector {
         if (p) (line.startsWith('OK') ? p.resolve(line.slice(2).trim()) : p.reject(new Error(line)));
       }
     });
-    this.proc.on('exit', () => {
+    proc.on('exit', () => {
+      if (this.proc !== proc) return; // already replaced by kill()
       for (const p of this.pending.splice(0)) p.reject(new Error('injector exited'));
       this.proc = null;
     });
@@ -122,6 +125,9 @@ class Injector {
         const idx = this.pending.indexOf(entry);
         if (idx >= 0) this.pending.splice(idx, 1);
         reject(new Error('injector timeout'));
+        // a late reply would be matched to the next command, and a helper that stopped
+        // answering (e.g. after sleep) stays stuck: start a fresh one next time
+        this.kill();
       }, timeoutMs);
       entry.resolve = (value) => { clearTimeout(t); resolve(value); };
       entry.reject = (e) => { clearTimeout(t); reject(e); };
@@ -163,7 +169,13 @@ class Injector {
     try { return (await this._send('FGAPP', 5000)) || ''; } catch { return ''; }
   }
   warmup() { try { this._ensure(); } catch (e) { console.error('injector warmup failed', e); } }
-  kill() { if (this.proc) { try { this.proc.kill(); } catch { /* ignore */ } this.proc = null; } }
+  kill() {
+    if (!this.proc) return;
+    const p = this.proc;
+    this.proc = null;
+    for (const entry of this.pending.splice(0)) entry.reject(new Error('injector restarted'));
+    try { p.kill(); } catch { /* ignore */ }
+  }
 }
 
 module.exports = new Injector();

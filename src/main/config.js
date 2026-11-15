@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { DEFAULT_VOCABULARY } = require('./coding');
+const { normalizeOverlaySettings } = require('./overlay-position');
 
 const DEFAULTS = {
   locale: 'auto', // 'auto' | 'en' | 'zh-Hant'
@@ -20,6 +21,8 @@ const DEFAULTS = {
   meetingSource: 'both', // 'both' (system audio + mic) | 'system' (system audio only, no mic needed)
   liveCaptionSec: 12, // live meeting captions: longest piece in seconds (shorter = faster, longer = more accurate)
   sounds: true,
+  overlayPosition: 'bottom-center', // recording pill: preset corner/edge, or 'custom' (dragged)
+  overlayCustom: null, // {x, y} fractions of the free space on the display, set by dragging
   saveDictationNotes: true,
   saveAudio: false,
   launchAtLogin: false,
@@ -44,12 +47,16 @@ class Config extends EventEmitter {
     try {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8').replace(/^﻿/, ''));
       this.data = { ...DEFAULTS, ...raw, ai: { ...DEFAULTS.ai, ...(raw.ai || {}) } };
+      Object.assign(this.data, normalizeOverlaySettings(this.data));
     } catch { /* first run */ }
   }
   get() { return this.data; }
   set(patch) {
     if (patch && typeof patch === 'object') {
       if (patch.ai) patch = { ...patch, ai: { ...this.data.ai, ...patch.ai } };
+      if ('overlayPosition' in patch || 'overlayCustom' in patch) {
+        patch = { ...patch, ...normalizeOverlaySettings({ ...this.data, ...patch }) };
+      }
       this.data = { ...this.data, ...patch };
       this.save();
       this.emit('changed', this.data, patch);

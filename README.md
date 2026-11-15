@@ -155,6 +155,8 @@ Not sure? *Settings → Models & engine → Hardware recommendation* picks an en
 
 - **Traditional Chinese output**: pick *Settings → Transcription → Chinese output script → Force Traditional* for a guaranteed script (OpenCC); a vocabulary hint like `以下是繁體中文的逐字稿：` further improves word choice.
 - **Tap to lock**: quick-tap the hotkey to keep recording hands-free; press it again to finish. `Esc` cancels.
+- **Move the recording pill**: if it covers the box you're typing in, drag it anywhere, or pick a corner in *Settings → Dictation → Recording indicator* (*Show* lets you place it without recording). The spot is remembered on every monitor.
+- **Sleep and hibernation**: no restart needed after the PC wakes up. WhisperPress re-arms its hotkey, refreshes the pill and checks the engine on its own; a dictation in progress when the PC goes to sleep is discarded, a meeting recording is stopped and saved.
 - **AI features**: install [Ollama](https://ollama.com), `ollama pull qwen3:4b`, then enable AI in Settings with the default base URL `http://localhost:11434/v1`.
 
 ## Limitations
