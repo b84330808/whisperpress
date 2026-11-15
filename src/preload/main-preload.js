@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const EVENTS = new Set([
   'app:navigate', 'engine:status', 'engine:progress', 'notes:changed',
-  'dictation:state', 'job:update', 'ai:chunk', 'settings:changed',
+  'dictation:state', 'job:update', 'ai:chunk', 'settings:changed', 'power:suspend',
 ]);
 
 contextBridge.exposeInMainWorld('wp', {
@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('wp', {
   noteAudio: (id) => ipcRenderer.invoke('notes:audio', id),
 
   toggleDictation: () => ipcRenderer.invoke('dictation:toggle'),
+  previewOverlay: () => ipcRenderer.invoke('overlay:preview'),
 
   startTranscription: (payload) => ipcRenderer.invoke('transcribe:start', payload),
   cancelTranscription: (id) => ipcRenderer.invoke('transcribe:cancel', id),

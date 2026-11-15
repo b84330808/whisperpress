@@ -11,6 +11,7 @@ const { EventEmitter } = require('events');
 const config = require('./config');
 const { isHallucination } = require('./hallucinations');
 const { looksChinese, isChineseText, postprocessChinese } = require('./chinese');
+const { inferenceTimeoutMs } = require('./recovery');
 
 const WHISPER_CPP_VERSION = 'v1.8.6';
 const ENGINE_ZIPS = {
@@ -58,6 +59,8 @@ class Engine extends EventEmitter {
     this.startSeq = 0;
     this.starting = null; // promise of the latest start()
     this.busy = false;
+    this.recovering = null; // single-flight server restart
+    this.exited = Promise.resolve(); // resolves when the last server process is gone
   }
 
   // ---------- paths / discovery ----------
@@ -282,10 +285,11 @@ class Engine extends EventEmitter {
 
   // Resolves true once the server is ready. A server that is still loading its
   // model is waited for, not restarted: a restart throws the load away, and the
-  // caller already waiting on it would fail with engine-not-ready.
+  // caller already waiting on it would fail with engine-not-ready. A restart in
+  // progress (restartServer) is waited for too.
   async ensureReady() {
     if (this.state === 'ready') return true;
-    let p = this.state === 'starting' ? this.starting : this.start();
+    let p = this.recovering || (this.state === 'starting' ? this.starting : this.start());
     for (;;) {
       const ok = await p;
       // a newer start() (e.g. a setting changed mid-load) replaced this one: follow it
@@ -296,7 +300,14 @@ class Engine extends EventEmitter {
 
   async _start() {
     const seq = ++this.startSeq;
+    const replacing = !!this.proc;
     this.stop();
+    if (replacing) {
+      // a hung (e.g. CUDA) server can hold the GPU until it is really gone
+      this._setState('starting', config.get().model || '');
+      await this.exited;
+      if (seq !== this.startSeq) return false;
+    }
     const cfg = config.get();
     const exe = this.findExe('whisper-server.exe');
     const modelId = cfg.model;
@@ -322,6 +333,7 @@ class Engine extends EventEmitter {
 
     const proc = spawn(exe, args, { cwd: path.dirname(exe), windowsHide: true });
     this.proc = proc;
+    this.exited = new Promise((resolve) => { proc.once('exit', resolve); proc.once('error', resolve); });
     let stderrTail = '';
     proc.stderr.on('data', (d) => { stderrTail = (stderrTail + d.toString()).slice(-2000); });
     proc.stdout.on('data', () => { /* drain */ });
@@ -355,16 +367,74 @@ class Engine extends EventEmitter {
       const p = this.proc;
       this.proc = null;
       try { p.kill(); } catch { /* ignore */ }
+      // don't wait forever for a process that ignores the kill
+      const gone = this.exited;
+      this.exited = Promise.race([gone, new Promise((r) => setTimeout(r, 5000))]);
     }
     if (this.state !== 'stopped') this._setState('stopped', this.stateDetail === 'no-engine' ? 'no-engine' : '');
   }
 
-  // ---------- transcription (short clips, warm server) ----------
-  async transcribe(wavBuffer, opts = {}) {
-    if (this.state !== 'ready') {
-      const ok = await this.ensureReady();
-      if (!ok) throw new Error('engine-not-ready');
+  // Restart the server once, even when several callers notice a failure at the same time.
+  restartServer(reason) {
+    if (!this.recovering) {
+      console.warn(`[engine] restarting whisper-server: ${reason}`);
+      this.recovering = this.start().finally(() => { this.recovering = null; });
     }
+    return this.recovering;
+  }
+
+  async _ready() {
+    if (!(await this.ensureReady())) throw new Error('engine-not-ready');
+  }
+
+  // Does the server still answer HTTP? (cheap; says nothing about the GPU)
+  async ping(timeoutMs = 2000) {
+    if (this.state !== 'ready' || !this.proc) return false;
+    try {
+      await fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(timeoutMs) });
+      return true;
+    } catch { return false; }
+  }
+
+  // After the PC wakes up: make sure a running server still works. The GPU flavor also
+  // gets a tiny real inference, since a CUDA context can break across hibernation while
+  // the HTTP side looks fine. Restarts the server when anything is off.
+  async checkHealth({ deep = false } = {}) {
+    if (this.state === 'error' && config.get().model) return this.restartServer('server had failed');
+    if (this.state !== 'ready') return true;
+    if (!(await this.ping())) return this.restartServer('server stopped answering');
+    if (!deep) return true;
+    const silence = Buffer.alloc(44 + 16000); // 0.5 s of silence
+    silence.write('RIFF', 0); silence.writeUInt32LE(36 + 16000, 4); silence.write('WAVE', 8);
+    silence.write('fmt ', 12); silence.writeUInt32LE(16, 16); silence.writeUInt16LE(1, 20); silence.writeUInt16LE(1, 22);
+    silence.writeUInt32LE(16000, 24); silence.writeUInt32LE(32000, 28); silence.writeUInt16LE(2, 32); silence.writeUInt16LE(16, 34);
+    silence.write('data', 36); silence.writeUInt32LE(16000, 40);
+    try {
+      await this._infer(silence, {}, 20000);
+      return true;
+    } catch (e) {
+      return this.restartServer(`test inference failed: ${e.message}`);
+    }
+  }
+
+  // ---------- transcription (short clips, warm server) ----------
+  // A dead or failing server is restarted and the clip retried once; a server that
+  // hangs is restarted and the clip given up on (retrying would double the wait).
+  async transcribe(wavBuffer, opts = {}) {
+    await this._ready();
+    try {
+      return await this._infer(wavBuffer, opts);
+    } catch (e) {
+      if (!e.restartable) throw e;
+      const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError';
+      await this.restartServer(timedOut ? 'inference timed out' : `inference failed: ${e.message}`);
+      if (timedOut) throw new Error('engine-timeout', { cause: e });
+      await this._ready();
+      return this._infer(wavBuffer, opts);
+    }
+  }
+
+  async _infer(wavBuffer, opts = {}, timeoutMs = inferenceTimeoutMs(wavBuffer.length)) {
     const cfg = config.get();
     const fd = new FormData();
     fd.append('file', new Blob([wavBuffer], { type: 'audio/wav' }), 'audio.wav');
@@ -375,8 +445,18 @@ class Engine extends EventEmitter {
     if (lang && lang !== 'auto') fd.append('language', lang);
     // per-request prompt (coding mode); the server's --prompt stays the default
     if (opts.prompt) fd.append('prompt', opts.prompt);
-    const res = await fetch(`http://127.0.0.1:${this.port}/inference`, { method: 'POST', body: fd });
-    if (!res.ok) throw new Error(`inference failed: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+    let res;
+    try {
+      res = await fetch(`http://127.0.0.1:${this.port}/inference`, { method: 'POST', body: fd, signal: AbortSignal.timeout(timeoutMs) });
+    } catch (e) {
+      e.restartable = true; // connection refused/reset, or timed out
+      throw e;
+    }
+    if (!res.ok) {
+      const err = new Error(`inference failed: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+      err.restartable = res.status >= 500;
+      throw err;
+    }
     const j = await res.json();
     if (j.error) throw new Error(`inference failed: ${j.error}`);
     const language = j.language || lang;

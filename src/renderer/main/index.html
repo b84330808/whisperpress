@@ -192,6 +192,19 @@
           <input type="checkbox" id="set-sounds" class="switch" />
         </div>
         <div class="row">
+          <label><span data-i18n="settings.overlayPosition"></span> <span class="tip" data-i18n-tip="settings.overlayPositionTip">ⓘ</span></label>
+          <select id="set-overlayPosition">
+            <option value="bottom-center" data-i18n="settings.posBottomCenter"></option>
+            <option value="top-center" data-i18n="settings.posTopCenter"></option>
+            <option value="bottom-left" data-i18n="settings.posBottomLeft"></option>
+            <option value="bottom-right" data-i18n="settings.posBottomRight"></option>
+            <option value="top-left" data-i18n="settings.posTopLeft"></option>
+            <option value="top-right" data-i18n="settings.posTopRight"></option>
+            <option value="custom" data-i18n="settings.posCustom"></option>
+          </select>
+          <button id="btn-overlay-preview" class="btn" data-i18n="settings.overlayPreview"></button>
+        </div>
+        <div class="row">
           <label data-i18n="settings.saveNotes"></label>
           <input type="checkbox" id="set-saveDictationNotes" class="switch" />
         </div>

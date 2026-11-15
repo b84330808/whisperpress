@@ -656,6 +656,8 @@ async function stopMeeting(discard = false) {
   await wp.startTranscription({ name, wav: encodeWav(pcm), durationMs, source: 'meeting', keepAudio: true });
 }
 $('#btn-meet-stop').addEventListener('click', () => stopMeeting());
+// the PC is going to sleep: finish the meeting recording now so it gets saved
+wp.on('power:suspend', () => { if (meeting.active) stopMeeting(); });
 
 // ---------------- settings ----------------
 function bindSimple(id, key, opts = {}) {
@@ -696,6 +698,7 @@ function fillSettingsForm() {
   $('#set-injectMode').value = settings.injectMode;
   $('#set-restoreClipboard').checked = settings.restoreClipboard;
   $('#set-sounds').checked = settings.sounds;
+  renderOverlayPosition();
   $('#set-saveDictationNotes').checked = settings.saveDictationNotes;
   $('#set-saveAudio').checked = settings.saveAudio;
   $('#set-translate').checked = settings.translate;
@@ -735,6 +738,7 @@ bindSimple('#set-tapToLock', 'tapToLock');
 bindSimple('#set-injectMode', 'injectMode');
 bindSimple('#set-restoreClipboard', 'restoreClipboard');
 bindSimple('#set-sounds', 'sounds');
+bindSimple('#set-overlayPosition', 'overlayPosition');
 bindSimple('#set-saveDictationNotes', 'saveDictationNotes');
 bindSimple('#set-saveAudio', 'saveAudio');
 bindSimple('#set-language', 'language');
@@ -765,6 +769,19 @@ $('#btn-hotkey').addEventListener('click', async () => {
   }
   btn.textContent = hotkeyLabel();
   renderEngineStatus();
+});
+
+// "Custom" only exists once the pill has been dragged somewhere.
+function renderOverlayPosition() {
+  const sel = $('#set-overlayPosition');
+  sel.querySelector('option[value="custom"]').hidden = !settings.overlayCustom;
+  sel.value = settings.overlayPosition || 'bottom-center';
+}
+$('#btn-overlay-preview').addEventListener('click', () => wp.previewOverlay());
+
+// microphones come and go (USB/Bluetooth, and again after the PC wakes up)
+navigator.mediaDevices.addEventListener('devicechange', () => {
+  if (document.querySelector('#view-settings.active')) populateMics();
 });
 
 async function populateMics() {
@@ -1015,6 +1032,8 @@ wp.on('notes:changed', () => refreshNotesThrottled());
 wp.on('settings:changed', (s) => {
   settings = s;
   renderEngineStatus();
+  // the pill can be dragged to a new place while settings are open
+  renderOverlayPosition();
   // coding mode can also be switched from the tray menu
   $('#set-codingMode').value = settings.codingMode || 'off';
   updateCodingRows();

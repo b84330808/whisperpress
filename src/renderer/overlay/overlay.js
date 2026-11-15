@@ -24,7 +24,6 @@ let stream = null;
 let ctx = null;
 let chunks = [];
 let recording = false;
-let capturing = null; // startCapture() still opening the mic
 let startedAt = 0;
 let levels = new Array(24).fill(0);
 let rafId = 0;
@@ -46,9 +45,16 @@ function beep(freq, ms, gainV = 0.05) {
   } catch { /* no output device */ }
 }
 
-async function startCapture(deviceId) {
-  chunks = [];
-  const constraints = {
+// Each recording gets a session number. Anything that resolves late (a microphone that
+// opens slowly right after wake-up, say) checks it and cleans up instead of recording
+// into a session that was already stopped or cancelled.
+let session = 0;
+let capturePending = null;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function micConstraints(deviceId) {
+  return {
     audio: {
       channelCount: 1,
       echoCancellation: true,
@@ -57,9 +63,40 @@ async function startCapture(deviceId) {
       ...(deviceId && deviceId !== 'default' ? { deviceId: { exact: deviceId } } : {}),
     },
   };
-  stream = await navigator.mediaDevices.getUserMedia(constraints);
-  ctx = new AudioContext({ sampleRate: 16000 });
-  await ctx.audioWorklet.addModule('../common/pcm-worklet.js');
+}
+
+// Right after wake-up, audio devices are still coming back: a busy or missing device is
+// retried once, and a chosen microphone that is gone falls back to the default one.
+async function openMic(deviceId) {
+  try {
+    return await navigator.mediaDevices.getUserMedia(micConstraints(deviceId));
+  } catch (err) {
+    if (!['NotReadableError', 'AbortError', 'NotFoundError', 'OverconstrainedError'].includes(err.name)) throw err;
+    await sleep(800);
+    try {
+      return await navigator.mediaDevices.getUserMedia(micConstraints(deviceId));
+    } catch (err2) {
+      if (!deviceId || deviceId === 'default') throw err2;
+      console.warn('chosen microphone unavailable, using the default one', err2.name);
+      return navigator.mediaDevices.getUserMedia(micConstraints('default'));
+    }
+  }
+}
+
+function releaseAudio(s, c) {
+  if (s) for (const tr of s.getTracks()) tr.stop();
+  if (c) c.close().catch(() => {});
+}
+
+async function startCapture(deviceId, my) {
+  chunks = [];
+  const s = await openMic(deviceId);
+  if (my !== session) { releaseAudio(s, null); return; }
+  const c = new AudioContext({ sampleRate: 16000 });
+  await c.audioWorklet.addModule('../common/pcm-worklet.js');
+  if (my !== session) { releaseAudio(s, c); return; }
+  stream = s;
+  ctx = c;
   const src = ctx.createMediaStreamSource(stream);
   const node = new AudioWorkletNode(ctx, 'pcm-capture');
   // worklet messages arrive every ~8 ms; aggregate to ~70 ms per bar or the
@@ -143,7 +180,18 @@ wp.onCmd(async (payload) => {
   const { cmd } = payload;
   if (cmd === 'localeChanged') {
     wp.dict().then((d) => { dict = d.strings; });
+  } else if (cmd === 'layout') {
+    document.body.classList.toggle('h-left', payload.h === 'left');
+    document.body.classList.toggle('h-right', payload.h === 'right');
+  } else if (cmd === 'preview') {
+    previewing = true;
+    codingOn = false;
+    setState('state-preview');
+    iconEl.textContent = '✥';
+    iconEl.style.color = '#a78bfa';
+    msgEl.textContent = t('overlay.previewHint');
   } else if (cmd === 'start') {
+    previewing = false;
     soundsOn = payload.sounds !== false;
     currentMode = payload.mode || 'hold';
     currentKey = payload.hotkeyLabel || 'F9';
@@ -156,25 +204,32 @@ wp.onCmd(async (payload) => {
     cancelAnimationFrame(rafId);
     drawLoop();
     beep(880, 90);
-    capturing = startCapture(payload.deviceId);
-    try {
-      await capturing;
-    } catch (err) {
-      wp.sendError(String(err.message || err));
+    const my = ++session;
+    capturePending = startCapture(payload.deviceId, my).catch((err) => {
+      if (my !== session) return;
       recording = false;
-    }
+      wp.sendError(String(err.message || err));
+    });
   } else if (cmd === 'stop') {
-    // opening the mic can take longer than a short press (e.g. Bluetooth headsets);
-    // a stop that arrives meanwhile must wait for it, or it is lost and the pill
-    // stays on "transcribing" while the mic keeps recording
-    if (capturing) await capturing.catch(() => {});
-    if (!recording) return;
+    // Always answer a stop, or main would wait for audio forever. Opening the mic can
+    // take longer than a short press (Bluetooth headsets, devices coming back after
+    // wake-up): give it a moment, then send what there is.
+    const my = session;
+    if (!recording && capturePending) {
+      await Promise.race([capturePending, sleep(3000)]);
+      if (my !== session) return;
+    }
+    if (!recording) {
+      session += 1; // a microphone that opens even later is closed right away
+      wp.sendAudio(encodeWav(new Float32Array(0)), 0);
+      return;
+    }
     beep(620, 90);
     const pcm = await stopCapture();
     const durationMs = Math.round((pcm.length / 16000) * 1000);
     wp.sendAudio(encodeWav(pcm), durationMs);
   } else if (cmd === 'cancel') {
-    if (capturing) await capturing.catch(() => {});
+    session += 1;
     if (recording) { await stopCapture(); }
     cancelAnimationFrame(rafId);
   } else if (cmd === 'coding') {
@@ -198,6 +253,11 @@ wp.onCmd(async (payload) => {
       iconEl.textContent = '∅';
       iconEl.style.color = '#9b96ad';
       msgEl.textContent = t('overlay.noSpeech');
+    } else if (payload.phase === 'notice') {
+      setState('state-empty');
+      iconEl.textContent = 'ⓘ';
+      iconEl.style.color = '#a78bfa';
+      msgEl.textContent = t(payload.msgKey);
     } else if (payload.phase === 'error') {
       setState('state-error');
       iconEl.textContent = '⚠';
@@ -208,8 +268,44 @@ wp.onCmd(async (payload) => {
   }
 });
 
+// ---------------- click to stop, drag to move ----------------
+// A press that moves more than a few pixels drags the pill (main moves the window with
+// the cursor and remembers the spot); a press that does not is a click.
+let previewing = false;
+let press = null;
+let dragging = false;
+let suppressClick = false;
+
+pill.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || e.target === cancelBtn) return;
+  press = { x: e.screenX, y: e.screenY };
+  try { pill.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+});
+pill.addEventListener('pointermove', (e) => {
+  if (!press || dragging) return;
+  if (Math.abs(e.screenX - press.x) + Math.abs(e.screenY - press.y) > 4) {
+    dragging = true;
+    pill.classList.add('dragging');
+    wp.dragStart();
+  }
+});
+function endPress() {
+  if (dragging) {
+    wp.dragEnd();
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 0);
+  }
+  press = null;
+  dragging = false;
+  pill.classList.remove('dragging');
+}
+pill.addEventListener('pointerup', endPress);
+pill.addEventListener('pointercancel', endPress);
+pill.addEventListener('lostpointercapture', endPress);
+
 pill.addEventListener('click', (e) => {
-  if (e.target === cancelBtn) return;
+  if (e.target === cancelBtn || suppressClick) return;
+  if (previewing) { previewing = false; wp.previewClose(); return; }
   if (recording) wp.stopClick();
 });
 cancelBtn.addEventListener('click', () => { if (recording) wp.cancelClick(); });
